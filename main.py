@@ -1,10 +1,9 @@
 import time
 import torch
-import matplotlib.pyplot as plt
 import pandas as pd
 import os
-import math
 from itertools import combinations
+from utils import plot_average_rows
 
 def rank_score_function(x):
     # Normalize the tensor row-wise between 0 and 1
@@ -76,42 +75,6 @@ def model_fusion(data, weight, fusion_type, combs, sc=True):
 def normalize(x):
     return (x - x.min()) / (x.max() - x.min())
 
-def plot_rsc(data_1, data_2, DATASET_LEN, iteration):
-    # Perform the processing for both datasets
-    datasets = [data_1.copy(), data_2.copy()]
-    fig, axes = plt.subplots(1, 2, figsize=(20, 8))  # Create 1 row and 2 columns of subplots
-    
-    for idx, scores in enumerate(datasets):
-        ranks = scores.rank(ascending=False)
-        labels = list(scores.keys())
-        
-        models = [f"M{i}" for i in range(len(labels))]
-        count = 0
-        for x, i in enumerate(labels):
-            s_i_score = sorted(normalize(scores[i]), reverse=True)  # Assuming normalize is defined elsewhere
-            s_i_rank = sorted(ranks[i], reverse=False)
-            axes[idx].plot(s_i_rank, s_i_score, label=models[x])
-            count += 1
-        print(f"Count: {count}")
-        axes[idx].grid(True)
-        # axes[idx].legend(loc='upper left', bbox_to_anchor=(1, 1))
-        
-        C_TYPE = "Score Combination" if idx == 0 else "Rank Combination"
-        
-        axes[idx].set_title(f'{C_TYPE}: {len(axes[idx].lines)} models')
-        axes[idx].set_xlabel('Rank')
-        axes[idx].set_ylabel(f"Normalized Scores")
-    
-    num_lines = len(axes[idx].lines)
-    plural = 's ' if num_lines > 1 else ' '
-    plt.suptitle(f'Average Rank-Score Characteristics\n{DATASET}: (D = {DATASET_LEN}, F = {math.floor(axes[0].get_xlim()[1])})', fontsize=20)
-    plt.figtext(0.5, 0.01, f"Iteration {iteration}", ha="center", fontsize=16)
-    plt.tight_layout()
-
-    n = len(os.listdir(f'./results/{ROOT}/{DATASET}'))
-    plt.savefig(f'./results/{ROOT}/{DATASET}/Avg RSC Iteration-{n}.png')
-    plt.close()
-
 def get_outputs(ROOT):
     score_data = {}
     ground_truth = None
@@ -125,7 +88,6 @@ def get_outputs(ROOT):
         else:
             ground_truth = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
     return score_data, ground_truth
-
 
 def batch_combination(score_data, rank_data, batch_size=64):
     sc_batches = []
@@ -177,41 +139,11 @@ def get_accuracies(models, ground_truth, sc=True):
         results[m] = percent_match
     return results
 
-def plot_average_rows(data_1, data_2, DATASET_LEN, iteration):
-    averages_1 = {}
-    for key, tensor in data_1.items():
-        # Compute the average across rows (dimension 0) for the tensor
-        row_average = tensor.mean(dim=0).numpy()  # Assuming the tensor is 2D and on CPU
-        averages_1[key] = row_average  # Store the average directly
-    average_rows_df_1 = pd.DataFrame(averages_1)
-    
-    averages_2 = {}
-    for key, tensor in data_2.items():
-        # Compute the average across rows (dimension 0) for the tensor
-        row_average = tensor.mean(dim=0).numpy()  # Assuming the tensor is 2D and on CPU
-        averages_2[key] = row_average  # Store the average directly
-
-    # Convert the averages to a pandas DataFrame
-    average_rows_df_2 = pd.DataFrame(averages_2)
-    plot_rsc(average_rows_df_1, average_rows_df_2, DATASET_LEN, iteration)
-
 def top_k(fusion_models, ground_truth, max_val, k=5, scores=True):
     results = get_accuracies(fusion_models.copy(), ground_truth.copy(), scores)
     top_performers = {key: value for key, value in results.items() if value > max_val}
     top_k_models = dict(sorted(top_performers.items(), key=lambda x: x[1], reverse=True)[:k])
     return top_k_models
-
-def plot_fusion_model_accuracies(results, max_original, title):
-    models = [f"M{i}" for i in range(len(results))]
-    plt.bar(models, list(results.values()))
-    plt.axhline(y=max_original, color='r', linestyle='--')
-    plt.title(title)
-    plt.xlabel("Models")
-    plt.ylabel('Accuracy')
-    plt.xticks(rotation=90) 
-    plt.tight_layout()
-    plt.show()
-    plt.close()
 
 def check_tie_ranks(tensor):
     unique_elements = torch.unique(tensor)
@@ -230,13 +162,13 @@ def update_max(top_m, highest_value_pair, max_val):
         return highest_value_pair, max_val
 
 # Expansion-Reduction Algorithm
-def expansion_reduction_1(fusion_models_sc, fusion_models_rc, highest_score_value_pair, highest_rank_value_pair, plot_avg_rsc=False):
+def expansion_reduction_1(fusion_models_sc, fusion_models_rc, highest_score_value_pair, highest_rank_value_pair, OUTPATH, plot_avg_rsc=False):
     max_s_val = highest_score_value_pair[1]
     max_r_val = max_s_val
     for i in range(15): # turn to while (len(top_5) > 0)
         print(f"Iteration: {i+1}")
         
-        if plot_avg_rsc: plot_average_rows(fusion_models_sc, fusion_models_rc, DATASET_LEN, i+1)
+        if plot_avg_rsc: plot_average_rows(fusion_models_sc, fusion_models_rc, OUTPATH, DATASET_LEN, i+1)
 
         # Scores
         top_5_sc_models = top_k(fusion_models_sc, ground_truth, max_s_val, K, True)
@@ -294,6 +226,7 @@ DATASET = 'lidar_trees_classification_d2'
 if not os.path.exists(f'./results/'): os.mkdir(f'./results/')
 if not os.path.exists(f'./results/{ROOT}'): os.mkdir(f'./results/{ROOT}')
 if not os.path.exists(f'./results/{ROOT}/{DATASET}'): os.mkdir(f'./results/{ROOT}/{DATASET}')
+OUTPATH = f'./results/{ROOT}/{DATASET}'
 
 BATCH_SIZE = 2048
 K = 5
@@ -322,10 +255,10 @@ highest_rank_value_pair = highest_score_value_pair
 for i in rank_tensors:
     print(f"Tie Ranks {i}: {check_tie_ranks(rank_tensors[i])}")
 
-if PLOT_AVG_RSC: plot_average_rows(score_tensors, rank_tensors, DATASET_LEN, 0)
+if PLOT_AVG_RSC: plot_average_rows(score_tensors, rank_tensors, OUTPATH, DATASET_LEN, 0)
 
 fusion_models_sc, fusion_models_rc = batch_combination(score_tensors, rank_tensors, BATCH_SIZE)
-highest_score_value_pair, highest_rank_value_pair = expansion_reduction_1(fusion_models_sc, fusion_models_rc, highest_score_value_pair, highest_rank_value_pair, PLOT_AVG_RSC)
+highest_score_value_pair, highest_rank_value_pair = expansion_reduction_1(fusion_models_sc, fusion_models_rc, highest_score_value_pair, highest_rank_value_pair, OUTPATH, PLOT_AVG_RSC)
 
 print("Algorithm time:", time.time() - start_time)
 top_2 = [highest_score_value_pair, highest_rank_value_pair]
