@@ -35,3 +35,32 @@ class RankScoreCharacteristic:
 
         return DS_dict
 
+class Weighting_Scheme:
+    def __init__(self, scores_batch, ranks_batch):
+        self.scores_batch = scores_batch
+        self.ranks_batch = ranks_batch
+
+        self.RSC = RankScoreCharacteristic()
+
+        # List of Weight Functions
+        self.init_functions = {
+            'AC': self.average_combination,
+            'WCDS': self.weighted_combination_diversity_strength,
+        }
+        self.values = {}
+
+    def __getitem__(self, key):
+        if key not in self.values:
+            if key in self.init_functions:
+                self.values[key] = self.init_functions[key]()
+            else:
+                raise KeyError(f"No function provided for key: {key}")
+        return self.values[key]
+
+    # Weight Functions
+    def average_combination(self):
+        return {m: 1 for m in self.scores_batch}
+
+    def weighted_combination_diversity_strength(self):
+        rank_score_functions = {m: self.scores_batch[m] * self.ranks_batch[m]**(-1) for m in self.scores_batch}
+        return self.RSC.diversity_strength(rank_score_functions)

@@ -1,13 +1,12 @@
-import time
 import torch
 import pandas as pd
 import os
 from itertools import combinations
 from utils import plot_average_rows
-from rank_score_characteristic import RankScoreCharacteristic
+from rank_score_characteristic import Weighting_Scheme
 
 class InFusionLayer:
-    def __init__(self, ROOT = './sklearn_models/', DATASET = 'lidar_trees_classification_d2', BATCH_SIZE = 2048) -> None:
+    def __init__(self, ROOT = './sklearn_models/', DATASET = 'lidar_trees_classification_d2', weighting_schemes = ['AC', 'WCDS'], BATCH_SIZE = 2048) -> None:
         self.ROOT = ROOT
         self.DATASET = DATASET
 
@@ -16,6 +15,7 @@ class InFusionLayer:
         if not os.path.exists(f'./results/{ROOT}/{DATASET}'): os.mkdir(f'./results/{ROOT}/{DATASET}')
         self.OUTPATH = f'./results/{ROOT}/{DATASET}'
 
+        self.weighting_schemes = weighting_schemes
         self.BATCH_SIZE = BATCH_SIZE
         self.K = 5
         self.PLOT_AVG_RSC = True
@@ -28,8 +28,6 @@ class InFusionLayer:
 
         self.base_models = list(score_data.keys())
         self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
-
-        self.RSC = RankScoreCharacteristic()
 
     def get_outputs(self, ROOT):
         score_data = {}
@@ -82,11 +80,18 @@ class InFusionLayer:
     def normalize(self, x):
         return (x - x.min()) / (x.max() - x.min())
 
-    def combinatorial_fusion_analysis(self, scores_batch, ranks_batch, combination_types, combs):
+    def weighting_scheme(self, scores_batch, ranks_batch):
+        dic = {}
+        Weight_Schemes = Weighting_Scheme(scores_batch, ranks_batch)
+        for scheme in self.weighting_schemes:
+            dic[scheme] = Weight_Schemes[scheme]
+        return dic
+
+    def combinatorial_fusion_analysis(self, scores_batch, ranks_batch, weighting_schemes, combs):
         sc, rc = {}, {}
-        for C_TYPE in combination_types:
-            sc.update(self.model_fusion(scores_batch, combination_types[C_TYPE], C_TYPE, combs, sc=True))
-            rc.update(self.model_fusion(ranks_batch, combination_types[C_TYPE], C_TYPE, combs, sc=False))
+        for C_TYPE in weighting_schemes:
+            sc.update(self.model_fusion(scores_batch, weighting_schemes[C_TYPE], C_TYPE, combs, sc=True))
+            rc.update(self.model_fusion(ranks_batch, weighting_schemes[C_TYPE], C_TYPE, combs, sc=False))
         return sc, rc
 
     def batch_combination(self, score_data, rank_data, batch_size=64):
@@ -104,16 +109,13 @@ class InFusionLayer:
             scores_batch = {d: scores[batch_indices] for d, scores in score_data.items()}
             ranks_batch = {d: ranks[batch_indices] for d, ranks in rank_data.items()}
             
-            # Example operations on the batch (assuming these functions are adapted to handle tensors)
-            rank_score_functions = {m: scores_batch[m] * ranks_batch[m]**(-1) for m in scores_batch}
-            ds_vector = self.RSC.diversity_strength(rank_score_functions)
-            ac_vector = {m:1 for m in ds_vector}
-            combination_types = {"AC": ac_vector, "WCDS": ds_vector}
+            # Obtain weight vectors based on a selection of weighting schemes
+            weighting_schemes = self.weighting_scheme(scores_batch, ranks_batch)
 
-            # CFA
-            sc, rc = self.combinatorial_fusion_analysis(scores_batch, ranks_batch, combination_types, combs)
-            sc_batches.append(sc)
-            rc_batches.append(rc)
+            # Use CFA to obtain score and rank combinations
+            score_combinations, rank_combinations = self.combinatorial_fusion_analysis(scores_batch, ranks_batch, weighting_schemes, combs)
+            sc_batches.append(score_combinations)
+            rc_batches.append(rank_combinations)
 
         concatenated_sc = {}
         concatenated_rc = {}
@@ -155,7 +157,6 @@ class InFusionLayer:
 
     def predict(self, matrices=False):
         print(f"Data Items: {self.DATASET_LEN}\n")
-        start_time = time.time()
         score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.score_data.items()}
 
         base_model_accuracies = self.get_accuracies(score_tensors.copy(), self.ground_truth.copy(), True)
@@ -189,17 +190,16 @@ class InFusionLayer:
             max_r_val = max_s_val
             self.highest_score_value_pair, max_s_val = self.update_max(fusion_models_sc, self.highest_score_value_pair, max_s_val)
             self.highest_rank_value_pair, max_r_val = self.update_max(fusion_models_rc, self.highest_rank_value_pair, max_r_val)
-            print("Algorithm time:", time.time() - start_time)
             top_2 = [self.highest_score_value_pair, self.highest_rank_value_pair]
             print(f"End Top Model: {max(top_2, key=lambda x: x[1])}\n")
             print(f"{max(top_2, key=lambda x: x[1])[1] - self.highest_start}% improvement from base models.")
             print("Done!")
 
 class InFusionNet(InFusionLayer):
-    def __init__(self, ROOT, DATASET, BATCH_SIZE) -> None:
+    def __init__(self, ROOT, DATASET, weighting_schemes, BATCH_SIZE) -> None:
         super(InFusionNet, self).__init__()
 
-        IFL = InFusionLayer(ROOT = ROOT, DATASET = DATASET, BATCH_SIZE = BATCH_SIZE)
+        IFL = InFusionLayer(ROOT = ROOT, DATASET = DATASET, weighting_schemes = weighting_schemes, BATCH_SIZE = BATCH_SIZE)
 
         self.fusion_models_sc, self.fusion_models_rc = IFL.predict(matrices=True)
         self.ground_truth = IFL.ground_truth
