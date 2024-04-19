@@ -5,55 +5,29 @@ import os
 from itertools import combinations
 from utils import plot_average_rows
 
-class InfusionLayer:
-    def __init__(self, ROOT = './sklearn_models/', DATASET = 'lidar_trees_classification_d2') -> None:
-        start_time = time.time()
+class InFusionLayer:
+    def __init__(self, ROOT = './sklearn_models/', DATASET = 'lidar_trees_classification_d2', BATCH_SIZE = 2048) -> None:
         self.ROOT = ROOT
         self.DATASET = DATASET
 
         if not os.path.exists(f'./results/'): os.mkdir(f'./results/')
         if not os.path.exists(f'./results/{ROOT}'): os.mkdir(f'./results/{ROOT}')
         if not os.path.exists(f'./results/{ROOT}/{DATASET}'): os.mkdir(f'./results/{ROOT}/{DATASET}')
-        OUTPATH = f'./results/{ROOT}/{DATASET}'
+        self.OUTPATH = f'./results/{ROOT}/{DATASET}'
 
-        self.BATCH_SIZE = BATCH_SIZE = 2048
-        self.K = K = 5
-        PLOT_AVG_RSC = True
+        self.BATCH_SIZE = BATCH_SIZE
+        self.K = 5
+        self.PLOT_AVG_RSC = True
 
         score_data, ground_truth = self.get_outputs(f"{ROOT}/{DATASET}")
+        self.score_data = score_data
         self.ground_truth = ground_truth
         rank_data = {i: score_data[i].rank(axis=1, ascending=False) for i in score_data}
+        self.rank_data = rank_data
 
-        base_models = list(score_data.keys())
+        self.base_models = list(score_data.keys())
         self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
         print(f"Data Items: {DATASET_LEN}")
-
-        score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in score_data.items()}
-
-        base_model_accuracies = self.get_accuracies(score_tensors.copy(), ground_truth.copy(), True)
-        for i in base_model_accuracies:
-            print(f"{i}: {base_model_accuracies[i]}")
-        highest_score_value_pair = max(base_model_accuracies.items(), key=lambda item: item[1])
-        highest_start = highest_score_value_pair[1]
-        print("Start:", highest_score_value_pair)
-
-        # Initialize Rank Variables using max Score info as base
-        rank_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in rank_data.items()}
-        highest_rank_value_pair = highest_score_value_pair
-
-        for i in rank_tensors:
-            print(f"Tie Ranks {i}: {self.check_tie_ranks(rank_tensors[i])}")
-
-        if PLOT_AVG_RSC: plot_average_rows(score_tensors, rank_tensors, OUTPATH, DATASET_LEN, 0)
-
-        fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, BATCH_SIZE)
-        highest_score_value_pair, highest_rank_value_pair = self.expansion_reduction_1(fusion_models_sc, fusion_models_rc, highest_score_value_pair, highest_rank_value_pair, OUTPATH, PLOT_AVG_RSC)
-
-        print("Algorithm time:", time.time() - start_time)
-        top_2 = [highest_score_value_pair, highest_rank_value_pair]
-        print(f"End: {max(top_2, key=lambda x: x[1])}")
-        print(f"{max(top_2, key=lambda x: x[1])[1] - highest_start}% improvement from base models.")
-        print("Done!")
 
     def rank_score_function(self, x):
         # Normalize the tensor row-wise between 0 and 1
@@ -190,12 +164,6 @@ class InfusionLayer:
             results[m] = percent_match
         return results
 
-    def top_k(self, fusion_models, ground_truth, max_val, k=5, scores=True):
-        results = self.get_accuracies(fusion_models.copy(), ground_truth.copy(), scores)
-        top_performers = {key: value for key, value in results.items() if value > max_val}
-        top_k_models = dict(sorted(top_performers.items(), key=lambda x: x[1], reverse=True)[:k])
-        return top_k_models
-
     def check_tie_ranks(self, tensor):
         unique_elements = torch.unique(tensor)
         return len(tensor) != len(unique_elements)
@@ -212,6 +180,59 @@ class InfusionLayer:
         except:
             return highest_value_pair, max_val
 
+    def predict(self, matrices=False):
+        start_time = time.time()
+        score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.score_data.items()}
+
+        base_model_accuracies = self.get_accuracies(score_tensors.copy(), self.ground_truth.copy(), True)
+        for i in base_model_accuracies:
+            print(f"{i}: {base_model_accuracies[i]}")
+        self.highest_score_value_pair = max(base_model_accuracies.items(), key=lambda item: item[1])
+        self.highest_start = self.highest_score_value_pair[1]
+        print("Start:", self.highest_score_value_pair)
+
+        # Initialize Rank Variables using max Score info as base
+        rank_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.rank_data.items()}
+        self.highest_rank_value_pair = self.highest_score_value_pair
+
+        for i in rank_tensors:
+            print(f"Tie Ranks {i}: {self.check_tie_ranks(rank_tensors[i])}")
+
+        if self.PLOT_AVG_RSC: plot_average_rows(score_tensors, rank_tensors, self.OUTPATH, self.DATASET_LEN, 0)
+
+        fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, self.BATCH_SIZE)
+
+        if matrices:
+            return fusion_models_sc, fusion_models_rc
+        else:
+            max_s_val = self.highest_score_value_pair[1]
+            max_r_val = max_s_val
+            self.highest_score_value_pair, max_s_val = self.update_max(fusion_models_sc, self.highest_score_value_pair, max_s_val)
+            self.highest_rank_value_pair, max_r_val = self.update_max(fusion_models_rc, self.highest_rank_value_pair, max_r_val)
+            print("Algorithm time:", time.time() - start_time)
+            top_2 = [self.highest_score_value_pair, self.highest_rank_value_pair]
+            print(f"End: {max(top_2, key=lambda x: x[1])}")
+            print(f"{max(top_2, key=lambda x: x[1])[1] - self.highest_start}% improvement from base models.")
+            print("Done!")
+
+class InFusionNet(InFusionLayer):
+    def __init__(self, ROOT, DATASET, BATCH_SIZE) -> None:
+        super(InFusionNet, self).__init__()
+
+        IFL = InFusionLayer(ROOT = ROOT, DATASET = DATASET, BATCH_SIZE = BATCH_SIZE)
+
+        self.fusion_models_sc, self.fusion_models_rc = IFL.predict(matrices=True)
+        self.ground_truth = IFL.ground_truth
+        self.highest_start = IFL.highest_start
+        self.highest_score_value_pair = IFL.highest_score_value_pair 
+        self.highest_rank_value_pair = IFL.highest_rank_value_pair
+
+    def top_k(self, fusion_models, ground_truth, max_val, k=5, scores=True):
+        results = self.get_accuracies(fusion_models.copy(), ground_truth.copy(), scores)
+        top_performers = {key: value for key, value in results.items() if value > max_val}
+        top_k_models = dict(sorted(top_performers.items(), key=lambda x: x[1], reverse=True)[:k])
+        return top_k_models
+    
     # Expansion-Reduction Algorithm
     def expansion_reduction_1(self, fusion_models_sc, fusion_models_rc, highest_score_value_pair, highest_rank_value_pair, OUTPATH, plot_avg_rsc=False):
         max_s_val = highest_score_value_pair[1]
@@ -236,7 +257,7 @@ class InfusionLayer:
             if len(top_5) == 0: break
 
             # Update the base models with the newly fused higher performing models
-            base_models = [m[0] for m in top_5]
+            self.base_models = [m[0] for m in top_5]
 
             # Update max/highest model values
             highest_score_value_pair, max_s_val = self.update_max(top_5_sc_models, highest_score_value_pair, max_s_val)
@@ -245,7 +266,7 @@ class InfusionLayer:
             # Create new score-rank tensors
             score_tensors = {}
             rank_tensors = {}
-            for model in base_models:
+            for model in self.base_models:
                 M = model[3:] # normalize the ranks for scores if using rank-scores
                 score_tensors[model] = fusion_models_sc[M] if model[:2] == "SC" else self.rank_norm(fusion_models_rc[M])
                 sorted_indices = score_tensors[model].argsort(dim=1, descending=True)
@@ -263,4 +284,15 @@ class InfusionLayer:
                 break
         return highest_score_value_pair, highest_rank_value_pair
 
-InfusionLayer(DATASET = 'mnist')
+    def predict(self):
+        highest_score_value_pair, highest_rank_value_pair = self.expansion_reduction_1(self.fusion_models_sc, self.fusion_models_rc, self.highest_score_value_pair, self.highest_rank_value_pair, self.OUTPATH, self.PLOT_AVG_RSC)
+        top_2 = [highest_score_value_pair, highest_rank_value_pair]
+        print(f"End: {max(top_2, key=lambda x: x[1])}")
+        print(f"{max(top_2, key=lambda x: x[1])[1] - self.highest_start}% improvement from base models.")
+        print("Done!")
+
+infusionlayer = InFusionLayer()
+infusionlayer.predict()
+
+infusionnet = InFusionNet(ROOT = './sklearn_models/', DATASET='mnist', BATCH_SIZE = 2048)
+infusionnet.predict()
