@@ -2,7 +2,7 @@ import torch
 import pandas as pd
 import os
 from itertools import combinations
-from utils import plot_average_rows
+from utils.utils import plot_average_rows
 from rank_score_characteristic import Weighting_Scheme
 
 class InFusionLayer:
