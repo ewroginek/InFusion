@@ -5,30 +5,7 @@ import os
 from itertools import combinations
 from utils import plot_average_rows
 
-class InFusionLayer:
-    def __init__(self, ROOT = './sklearn_models/', DATASET = 'lidar_trees_classification_d2', BATCH_SIZE = 2048) -> None:
-        self.ROOT = ROOT
-        self.DATASET = DATASET
-
-        if not os.path.exists(f'./results/'): os.mkdir(f'./results/')
-        if not os.path.exists(f'./results/{ROOT}'): os.mkdir(f'./results/{ROOT}')
-        if not os.path.exists(f'./results/{ROOT}/{DATASET}'): os.mkdir(f'./results/{ROOT}/{DATASET}')
-        self.OUTPATH = f'./results/{ROOT}/{DATASET}'
-
-        self.BATCH_SIZE = BATCH_SIZE
-        self.K = 5
-        self.PLOT_AVG_RSC = True
-
-        score_data, ground_truth = self.get_outputs(f"{ROOT}/{DATASET}")
-        self.score_data = score_data
-        self.ground_truth = ground_truth
-        rank_data = {i: score_data[i].rank(axis=1, ascending=False) for i in score_data}
-        self.rank_data = rank_data
-
-        self.base_models = list(score_data.keys())
-        self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
-        print(f"Data Items: {DATASET_LEN}")
-
+class RankScoreCharacteristic:
     def rank_score_function(self, x):
         # Normalize the tensor row-wise between 0 and 1
         min_val = x.min(dim=1, keepdim=True).values
@@ -62,6 +39,32 @@ class InFusionLayer:
         DS_dict = {T[i]: ds[i].item() for i in range(num_items)}
 
         return DS_dict
+
+class InFusionLayer:
+    def __init__(self, ROOT = './sklearn_models/', DATASET = 'lidar_trees_classification_d2', BATCH_SIZE = 2048) -> None:
+        self.ROOT = ROOT
+        self.DATASET = DATASET
+
+        if not os.path.exists(f'./results/'): os.mkdir(f'./results/')
+        if not os.path.exists(f'./results/{ROOT}'): os.mkdir(f'./results/{ROOT}')
+        if not os.path.exists(f'./results/{ROOT}/{DATASET}'): os.mkdir(f'./results/{ROOT}/{DATASET}')
+        self.OUTPATH = f'./results/{ROOT}/{DATASET}'
+
+        self.BATCH_SIZE = BATCH_SIZE
+        self.K = 5
+        self.PLOT_AVG_RSC = True
+
+        score_data, ground_truth = self.get_outputs(f"{ROOT}/{DATASET}")
+        self.score_data = score_data
+        self.ground_truth = ground_truth
+        rank_data = {i: score_data[i].rank(axis=1, ascending=False) for i in score_data}
+        self.rank_data = rank_data
+
+        self.base_models = list(score_data.keys())
+        self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
+        print(f"Data Items: {DATASET_LEN}")
+
+        self.RSC = RankScoreCharacteristic()
 
     def get_combinations(self, models):
         lengths = [x for x in range(len(models)+1)]
@@ -114,6 +117,13 @@ class InFusionLayer:
                 ground_truth = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
         return score_data, ground_truth
 
+    def combinatorial_fusion_analysis(self, scores_batch, ranks_batch, combination_types, combs):
+        sc, rc = {}, {}
+        for C_TYPE in combination_types:
+            sc.update(self.model_fusion(scores_batch, combination_types[C_TYPE], C_TYPE, combs, sc=True))
+            rc.update(self.model_fusion(ranks_batch, combination_types[C_TYPE], C_TYPE, combs, sc=False))
+        return sc, rc
+
     def batch_combination(self, score_data, rank_data, batch_size=64):
         sc_batches = []
         rc_batches = []
@@ -131,14 +141,12 @@ class InFusionLayer:
             
             # Example operations on the batch (assuming these functions are adapted to handle tensors)
             rank_score_functions = {m: scores_batch[m] * ranks_batch[m]**(-1) for m in scores_batch}
-            ds_vector = self.diversity_strength(rank_score_functions)
+            ds_vector = self.RSC.diversity_strength(rank_score_functions)
             ac_vector = {m:1 for m in ds_vector}
             combination_types = {"AC": ac_vector, "WCDS": ds_vector}
 
-            sc, rc = {}, {}
-            for C_TYPE in combination_types:
-                sc.update(self.model_fusion(scores_batch, combination_types[C_TYPE], C_TYPE, combs, sc=True))
-                rc.update(self.model_fusion(ranks_batch, combination_types[C_TYPE], C_TYPE, combs, sc=False))
+            # CFA
+            sc, rc = self.combinatorial_fusion_analysis(scores_batch, ranks_batch, combination_types, combs)
             sc_batches.append(sc)
             rc_batches.append(rc)
 
