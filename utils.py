@@ -16,13 +16,10 @@ def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
         labels = list(scores.keys())
         
         models = [f"M{i}" for i in range(len(labels))]
-        count = 0
         for x, i in enumerate(labels):
             s_i_score = sorted(normalize(scores[i]), reverse=True)  # Assuming normalize is defined elsewhere
             s_i_rank = sorted(ranks[i], reverse=False)
             axes[idx].plot(s_i_rank, s_i_score, label=models[x])
-            count += 1
-        print(f"Count: {count}")
         axes[idx].grid(True)
         # axes[idx].legend(loc='upper left', bbox_to_anchor=(1, 1))
         
