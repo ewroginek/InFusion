@@ -36,7 +36,7 @@ def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
     plt.tight_layout()
 
     n = len(os.listdir(f'{OUTPATH}'))
-    plt.savefig(f'{OUTPATH}/Avg RSC Iteration-{n}.png')
+    plt.savefig(f'{OUTPATH}/Avg RSC Iteration-{iteration}.png')
     plt.close()
 
 def plot_fusion_model_accuracies(results, max_original, title):
