@@ -261,7 +261,7 @@ class InFusionNet(InFusionLayer):
             if len(score_tensors) > 0:
                 fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, model_accuracies, self.BATCH_SIZE)
 
-                # Filter out any tensors with NaN values
+                # Filter out any invalid model combination tensors that contain NaN values
                 fusion_models_sc = {k: v for k, v in fusion_models_sc.items() if not torch.isnan(v).any()}
                 fusion_models_rc = {k: v for k, v in fusion_models_rc.items() if not torch.isnan(v).any()}
             else:
