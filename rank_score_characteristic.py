@@ -40,6 +40,10 @@ class Weighting_Scheme:
         self.scores_batch = scores_batch
         self.ranks_batch = ranks_batch
 
+        # Save model names as a list for clarity
+        # (scores_batch and ranks_batch model names are the same)
+        self.models = scores_batch.keys()
+
         self.RSC = RankScoreCharacteristic()
 
         # List of Weight Functions
@@ -59,8 +63,8 @@ class Weighting_Scheme:
 
     # Weight Functions
     def average_combination(self):
-        return {m: 1 for m in self.scores_batch}
+        return {m: 1 for m in self.models}
 
     def weighted_combination_diversity_strength(self):
-        rank_score_functions = {m: self.scores_batch[m] * self.ranks_batch[m]**(-1) for m in self.scores_batch}
+        rank_score_functions = {m: self.scores_batch[m] * self.ranks_batch[m]**(-1) for m in self.models}
         return self.RSC.diversity_strength(rank_score_functions)

@@ -80,6 +80,7 @@ class InFusionLayer:
     def normalize(self, x):
         return (x - x.min()) / (x.max() - x.min())
 
+    # This function obtains weights only for the weighting schemes selected at layer initialization
     def weighting_scheme(self, scores_batch, ranks_batch):
         dic = {}
         Weight_Schemes = Weighting_Scheme(scores_batch, ranks_batch)
