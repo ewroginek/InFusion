@@ -81,9 +81,9 @@ class InFusionLayer:
         return (x - x.min()) / (x.max() - x.min())
 
     # This function obtains weights only for the weighting schemes selected at layer initialization
-    def weighting_scheme(self, scores_batch, ranks_batch):
+    def weighting_scheme(self, scores_batch, ranks_batch, model_accuracies):
         dic = {}
-        Weight_Schemes = Weighting_Scheme(scores_batch, ranks_batch)
+        Weight_Schemes = Weighting_Scheme(scores_batch, ranks_batch, model_accuracies)
         for scheme in self.weighting_schemes:
             dic[scheme] = Weight_Schemes[scheme]
         return dic
@@ -95,7 +95,7 @@ class InFusionLayer:
             rc.update(self.model_fusion(ranks_batch, weighting_schemes[C_TYPE], C_TYPE, combs, sc=False))
         return sc, rc
 
-    def batch_combination(self, score_data, rank_data, batch_size=64):
+    def batch_combination(self, score_data, rank_data, model_accuracies, batch_size=64):
         sc_batches = []
         rc_batches = []
 
@@ -111,7 +111,7 @@ class InFusionLayer:
             ranks_batch = {d: ranks[batch_indices] for d, ranks in rank_data.items()}
             
             # Obtain weight vectors based on a selection of weighting schemes
-            weighting_schemes = self.weighting_scheme(scores_batch, ranks_batch)
+            weighting_schemes = self.weighting_scheme(scores_batch, ranks_batch, model_accuracies)
 
             # Use CFA to obtain score and rank combinations
             score_combinations, rank_combinations = self.combinatorial_fusion_analysis(scores_batch, ranks_batch, weighting_schemes, combs)
@@ -182,7 +182,7 @@ class InFusionLayer:
 
         if self.PLOT_AVG_RSC: plot_average_rows(score_tensors, rank_tensors, self.OUTPATH, self.DATASET_LEN, 0)
 
-        fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, self.BATCH_SIZE)
+        fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, base_model_accuracies, self.BATCH_SIZE)
 
         if matrices:
             return fusion_models_sc, fusion_models_rc
@@ -198,7 +198,7 @@ class InFusionLayer:
 
 class InFusionNet(InFusionLayer):
     def __init__(self, ROOT, DATASET, weighting_schemes, BATCH_SIZE) -> None:
-        super(InFusionNet, self).__init__()
+        super().__init__(ROOT, DATASET, weighting_schemes, BATCH_SIZE)
 
         IFL = InFusionLayer(ROOT = ROOT, DATASET = DATASET, weighting_schemes = weighting_schemes, BATCH_SIZE = BATCH_SIZE)
 
@@ -210,8 +210,8 @@ class InFusionNet(InFusionLayer):
         self.OUTPATH = IFL.OUTPATH
 
     def top_k(self, fusion_models, ground_truth, max_val, k=5, scores=True):
-        results = self.get_accuracies(fusion_models.copy(), ground_truth.copy(), scores)
-        top_performers = {key: value for key, value in results.items() if value > max_val}
+        model_accuracies = self.get_accuracies(fusion_models.copy(), ground_truth.copy(), scores)
+        top_performers = {key: value for key, value in model_accuracies.items() if value > max_val}
         top_k_models = dict(sorted(top_performers.items(), key=lambda x: x[1], reverse=True)[:k])
         return top_k_models
     
@@ -234,13 +234,14 @@ class InFusionNet(InFusionLayer):
             # Pool SC & RC Models
             combined = {f'SC_{key}': value for key, value in top_5_sc_models.items()}
             combined.update({f'RC_{key}': value for key, value in top_5_rc_models.items()})
-            top_5 = sorted(combined.items(), key=lambda item: item[1], reverse=True)[:self.K]
+            top_k = sorted(combined.items(), key=lambda item: item[1], reverse=True)[:self.K]
             
             # Termination condition
-            if len(top_5) == 0: break
+            if len(top_k) == 0: break
 
             # Update the base models with the newly fused higher performing models
-            self.base_models = [m[0] for m in top_5]
+            self.base_models = [m[0] for m in top_k]
+            model_accuracies = {model: accuracy for model, accuracy in top_k}
 
             # Update max/highest model values
             highest_score_value_pair, max_s_val = self.update_max(top_5_sc_models, highest_score_value_pair, max_s_val)
@@ -258,7 +259,7 @@ class InFusionNet(InFusionLayer):
             
             # Batch combination
             if len(score_tensors) > 0:
-                fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, self.BATCH_SIZE)
+                fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, model_accuracies, self.BATCH_SIZE)
 
                 # Filter out any tensors with NaN values
                 fusion_models_sc = {k: v for k, v in fusion_models_sc.items() if not torch.isnan(v).any()}
