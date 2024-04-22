@@ -21,6 +21,7 @@ class InFusionLayer:
         self.PLOT_AVG_RSC = True
 
         score_data, ground_truth = self.get_outputs(f"{ROOT}/{DATASET}")
+        
         self.score_data = score_data
         self.ground_truth = ground_truth
         rank_data = {i: score_data[i].rank(axis=1, ascending=False) for i in score_data}
@@ -29,19 +30,48 @@ class InFusionLayer:
         self.base_models = list(score_data.keys())
         self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
 
+#     def get_outputs(self, ROOT):
+#         score_data = {}
+#         ground_truth = None
+
+#         paths = os.listdir(ROOT)
+
+#         for path in paths:
+#             model = path.split("_")[0]
+#             print(model)
+#             if path.endswith('_scores.csv'):
+#                 print(f"{ROOT}/{path}")
+#                 score_data[model] = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
+#             else:
+#                 ground_truth = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
+#         return score_data, ground_truth
+    
+    
+    
     def get_outputs(self, ROOT):
         score_data = {}
-        ground_truth = None
+        ground_truth = {}
 
-        paths = os.listdir(ROOT)
+        # Iterate over files and directories in ROOT
+        for item in os.listdir(ROOT):
+            path = os.path.join(ROOT, item)
 
-        for path in paths:
-            model = path.split("_")[0]
-            if path.endswith('_scores.csv'):
-                score_data[model] = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
-            else:
-                ground_truth = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
+            # Check if the item is a file
+            if os.path.isfile(path):
+                model = item.split("_")[0]
+
+                # Check if the file ends with '_scores.csv'
+                if item.endswith('_scores.csv'):
+                    score_data[model] = pd.read_csv(path).iloc[:, 1:]
+                else:
+                    ground_truth[model] = pd.read_csv(path).iloc[:, 1:]
+
         return score_data, ground_truth
+    
+    
+    
+    
+    
     
     def get_combinations(self, models):
         lengths = [x for x in range(len(models)+1)]

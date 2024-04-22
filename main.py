@@ -2,9 +2,9 @@ import time
 from models import InFusionLayer, InFusionNet
 
 ROOT = './data'
-DATASET = 'sklearn_models'
+DATASET = 'llm'
 weighting_schemes = ['AC', 'WCDS', 'WCP']
-BATCH_SIZE = 1
+BATCH_SIZE = 2048
 
 # infusionlayer = InFusionLayer(ROOT = ROOT, DATASET = DATASET, weighting_schemes = weighting_schemes, BATCH_SIZE = BATCH_SIZE)
 # infusionlayer.predict()
