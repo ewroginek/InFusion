@@ -1,3 +1,8 @@
 Imagenet1k/
 results/
 sklearn_models/
+.ipynb_checkpoints/
+__pycache__/
+utils/__pycache__/
+*.pyc
+

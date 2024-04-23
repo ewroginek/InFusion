@@ -29,6 +29,8 @@ class InFusionLayer:
 
         self.base_models = list(score_data.keys())
         self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
+        # self.DATASET_LEN = DATASET_LEN = len(ground_truth.get('0', []))
+
 
 #     def get_outputs(self, ROOT):
 #         score_data = {}
@@ -64,14 +66,13 @@ class InFusionLayer:
                 if item.endswith('_scores.csv'):
                     score_data[model] = pd.read_csv(path).iloc[:, 1:]
                 else:
-                    ground_truth[model] = pd.read_csv(path).iloc[:, 1:]
-
+                    ground_truth = pd.read_csv(path).iloc[:, 1:]
+                    
+                    # print(ground_truth)
+# 
         return score_data, ground_truth
     
-    
-    
-    
-    
+
     
     def get_combinations(self, models):
         lengths = [x for x in range(len(models)+1)]
@@ -81,6 +82,7 @@ class InFusionLayer:
             for i in comb:
                 if len(i) > 1: 
                     combs.append(i)
+        # print(combs)
         return combs
 
     def model_fusion(self, data, weight, fusion_type, combs, sc=True):
@@ -90,12 +92,15 @@ class InFusionLayer:
 
         for comb in combs:
             label = ''.join(comb)
+            print(model_combination)
             # Using torch.zeros_like to initialize a tensor of zeros with the same shape as any of the input tensors
             sum_numerator = torch.zeros_like(next(iter(data.values())))
             sum_denominator = torch.zeros_like(next(iter(data.values())))
+            # print("label",label,sum_numerator,sum_denominator)
 
             # Apply Weighted Combination
             for model in comb:
+                print(weight[model])
                 w = weight[model] if sc else (1/weight[model])
                 sum_numerator += model_combination[model] * w
                 sum_denominator += w

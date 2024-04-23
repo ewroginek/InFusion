@@ -3,8 +3,10 @@ from models import InFusionLayer, InFusionNet
 
 ROOT = './data'
 DATASET = 'llm'
+
+# DATASET = 'sklearn_models'
 weighting_schemes = ['AC', 'WCDS', 'WCP']
-BATCH_SIZE = 2048
+BATCH_SIZE = 1
 
 # infusionlayer = InFusionLayer(ROOT = ROOT, DATASET = DATASET, weighting_schemes = weighting_schemes, BATCH_SIZE = BATCH_SIZE)
 # infusionlayer.predict()

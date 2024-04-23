@@ -2,7 +2,9 @@ import time
 from models import InFusionLayer, InFusionNet
 
 ROOT = './data'
-DATASET = 'sklearn_models'
+DATASET = 'llm'
+
+# DATASET = 'sklearn_models'
 weighting_schemes = ['AC', 'WCDS', 'WCP']
 BATCH_SIZE = 1
 
