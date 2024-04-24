@@ -13,14 +13,14 @@ class InFusionLayer:
         self.BATCH_SIZE = BATCH_SIZE
         self.K = 5
         self.PLOT_AVG_RSC = True
-        
+
         self.score_data = score_data
         self.ground_truth = ground_truth
         rank_data = {i: score_data[i].rank(axis=1, ascending=False) for i in score_data}
         self.rank_data = rank_data
 
         self.base_models = list(score_data.keys())
-        self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
+        self.DATASET_LEN = len(ground_truth)
     
     def get_combinations(self, models):
         lengths = [x for x in range(len(models)+1)]
@@ -45,6 +45,7 @@ class InFusionLayer:
 
             # Apply Weighted Combination
             for model in comb:
+                if weight[model] == 0: continue
                 w = weight[model] if sc else (1/weight[model])
                 sum_numerator += model_combination[model] * w
                 sum_denominator += w
@@ -110,7 +111,7 @@ class InFusionLayer:
 
     def get_accuracies(self, models, ground_truth, sc=True):
         results = {}
-        gt_tensor = torch.tensor(ground_truth['0'].values)
+        gt_tensor = torch.tensor(ground_truth.values)
 
         for m in models:
             _, indices = torch.max(models[m], dim=1) if sc else torch.min(models[m], dim=1)

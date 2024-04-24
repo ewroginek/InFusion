@@ -6,7 +6,6 @@ from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score
-import numpy as np
 import pandas as pd
 import os
 
@@ -19,7 +18,7 @@ def classification_suite(models, X_train, y_train, X_test, out):
         class_probabilities = model.predict_proba(X_test)
         pd.DataFrame(class_probabilities).to_csv(f"{out}/{M}_scores.csv")
 
-        predictions[M] = class_probabilities
+        predictions[M] = pd.DataFrame(class_probabilities)
 
         # Show accuracy
         y_pred = model.predict(X_test)
@@ -78,7 +77,7 @@ def get_shuttle_logs():
 # Also consider emotion classification: https://www.kaggle.com/code/bhavikjikadara/emotions-classification-lstm-nlp-94
 
 # feature_data = [get_lidar_data(1), get_lidar_data(2), get_mnist(), get_shuttle_logs()]
-feature_data= [get_shuttle_logs()]
+feature_data= [get_mnist()]
 
 random_forest = RandomForestClassifier(n_estimators=100, random_state=42)
 adaBoost = AdaBoostClassifier(n_estimators=100)
@@ -96,10 +95,12 @@ models = {
 
 for data in feature_data:
     X_train, X_test, y_train, y_test, out = data
-    preds = classification_suite(models, X_train, y_train, X_test, out)
-
     ground_truths = pd.DataFrame(y_test)
     ground_truths.columns = range(ground_truths.shape[1])
+    # break
+    preds = classification_suite(models, X_train, y_train, X_test, out)
+    print(preds)
+
 
     # Different labels needed for shuttle logs
     if out == './sklearn_models/shuttle_logs':
@@ -107,4 +108,3 @@ for data in feature_data:
         ground_truths = ground_truths[0] - 1 # for shuttle_logs
     
     ground_truths.to_csv(f'{out}/ground_truths.csv')
-
