@@ -5,7 +5,7 @@ This script allows users to run the InFusion model with customizable settings vi
 ### Command-Line Arguments
 
 - `--root`: Specifies the root directory where the models will be saved. Default is './sklearn_models/'.
-- `--tenseorset`: Specifies the tensor set to be used. Default is 'mnist'.
+- `--tensorset`: Specifies the tensor set to be used. Default is 'mnist'.
 - `--batch_size`: Specifies the batch size for the model. Default is 2048.
 - `--weighting_schemes`: Specifies a comma-separated list of weighting schemes to be used. Default is 'AC,WCDS,WCP'. Valid schemes are 'AC', 'WCDS', and 'WCP'.
 - `--model_type`: Specifies the type of model to use. Choose 'layer' for `InFusionLayer` or 'net' for `InFusionNet`. Default is 'net'.

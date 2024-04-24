@@ -6,21 +6,14 @@ from utils.utils import plot_average_rows
 from rank_score_characteristic import Weighting_Scheme
 
 class InFusionLayer:
-    def __init__(self, ROOT = './sklearn_models/', DATASET = 'lidar_trees_classification_d2', weighting_schemes = ['AC', 'WCDS'], BATCH_SIZE = 2048) -> None:
-        self.ROOT = ROOT
-        self.DATASET = DATASET
-
-        if not os.path.exists(f'./results/'): os.mkdir(f'./results/')
-        if not os.path.exists(f'./results/{ROOT}'): os.mkdir(f'./results/{ROOT}')
-        if not os.path.exists(f'./results/{ROOT}/{DATASET}'): os.mkdir(f'./results/{ROOT}/{DATASET}')
-        self.OUTPATH = f'./results/{ROOT}/{DATASET}'
+    def __init__(self, score_data, ground_truth, OUTPATH = './results/sklearn_models/lidar_trees_classification_d2', weighting_schemes = ['AC', 'WCDS'], BATCH_SIZE = 2048) -> None:
+        self.OUTPATH = OUTPATH
 
         self.weighting_schemes = weighting_schemes
         self.BATCH_SIZE = BATCH_SIZE
         self.K = 5
         self.PLOT_AVG_RSC = True
-
-        score_data, ground_truth = self.get_outputs(f"{ROOT}/{DATASET}")
+        
         self.score_data = score_data
         self.ground_truth = ground_truth
         rank_data = {i: score_data[i].rank(axis=1, ascending=False) for i in score_data}
@@ -28,20 +21,6 @@ class InFusionLayer:
 
         self.base_models = list(score_data.keys())
         self.DATASET_LEN = DATASET_LEN = len(ground_truth['0'])
-
-    def get_outputs(self, ROOT):
-        score_data = {}
-        ground_truth = None
-
-        paths = os.listdir(ROOT)
-
-        for path in paths:
-            model = path.split("_")[0]
-            if path.endswith('_scores.csv'):
-                score_data[model] = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
-            else:
-                ground_truth = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
-        return score_data, ground_truth
     
     def get_combinations(self, models):
         lengths = [x for x in range(len(models)+1)]
@@ -197,10 +176,10 @@ class InFusionLayer:
             print("Done!")
 
 class InFusionNet(InFusionLayer):
-    def __init__(self, ROOT, DATASET, weighting_schemes, BATCH_SIZE) -> None:
-        super().__init__(ROOT, DATASET, weighting_schemes, BATCH_SIZE)
+    def __init__(self, score_data, ground_truth, OUTPATH, weighting_schemes, BATCH_SIZE) -> None:
+        super().__init__(score_data, ground_truth, OUTPATH, weighting_schemes, BATCH_SIZE)
 
-        IFL = InFusionLayer(ROOT = ROOT, DATASET = DATASET, weighting_schemes = weighting_schemes, BATCH_SIZE = BATCH_SIZE)
+        IFL = InFusionLayer(score_data, ground_truth, OUTPATH, weighting_schemes = weighting_schemes, BATCH_SIZE = BATCH_SIZE)
 
         self.fusion_models_sc, self.fusion_models_rc = IFL.predict(matrices=True)
         self.ground_truth = IFL.ground_truth

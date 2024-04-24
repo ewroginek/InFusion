@@ -1,10 +1,12 @@
 import argparse
 import time
+import os
 from models import InFusionLayer, InFusionNet
+from utils.utils import get_outputs
 
 def main(args):
     ROOT = args.root
-    DATASET = args.dataset
+    DATASET = args.tensorset
     BATCH_SIZE = args.batch_size
     MODEL_TYPE = args.model_type
     weighting_schemes = args.weighting_schemes.split(',')
@@ -14,14 +16,21 @@ def main(args):
     if not all(scheme in valid_schemes for scheme in weighting_schemes):
         raise ValueError(f"Invalid weighting scheme. Choose from: {', '.join(valid_schemes)}")
 
+    if not os.path.exists(f'./results/'): os.mkdir(f'./results/')
+    if not os.path.exists(f'./results/{ROOT}'): os.mkdir(f'./results/{ROOT}')
+    if not os.path.exists(f'./results/{ROOT}/{DATASET}'): os.mkdir(f'./results/{ROOT}/{DATASET}')
+    OUTPATH = f'./results/{ROOT}/{DATASET}'
+
+    score_data, ground_truth = get_outputs(f"{ROOT}/{DATASET}")
+
     # Record start time
     start_time = time.time()
 
     # Initialize the correct model based on user input
     if MODEL_TYPE == 'layer':
-        model = InFusionLayer(ROOT=ROOT, DATASET=DATASET, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
+        model = InFusionLayer(score_data, ground_truth, OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
     elif MODEL_TYPE == 'net':
-        model = InFusionNet(ROOT=ROOT, DATASET=DATASET, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
+        model = InFusionNet(score_data, ground_truth, OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
     else:
         raise ValueError("Invalid model type. Choose 'layer' or 'net'.")
 
