@@ -12,7 +12,13 @@ This script allows users to run the InFusion model with customizable settings vi
 
 ### Running the Script
 
-To run the script, use the following command in your terminal. You can adjust the parameters as needed.
+Given a directory of prediction tensors as a .csv file, you can use the following command in your terminal. You can adjust the parameters as needed.
 
 ```bash
 python main.py --root './tensor_predictions/' --tensorset 'mnist' --batch_size 1024 --weighting_schemes 'AC,WCP' --model_type 'layer'
+```
+
+If you'd like to improve classification accuracy immediately after model training, you can run the following code to see an example of how this is done using 5 sklearn models trained on the MNIST dataset.
+
+```bash
+python run.py
