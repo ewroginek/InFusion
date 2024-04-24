@@ -92,7 +92,7 @@ class InFusionLayer:
 
         for comb in combs:
             label = ''.join(comb)
-            print(model_combination)
+            # print(model_combination)
             # Using torch.zeros_like to initialize a tensor of zeros with the same shape as any of the input tensors
             sum_numerator = torch.zeros_like(next(iter(data.values())))
             sum_denominator = torch.zeros_like(next(iter(data.values())))
@@ -100,7 +100,7 @@ class InFusionLayer:
 
             # Apply Weighted Combination
             for model in comb:
-                print(weight[model])
+                # print(weight[model])
                 w = weight[model] if sc else (1/weight[model])
                 sum_numerator += model_combination[model] * w
                 sum_denominator += w
