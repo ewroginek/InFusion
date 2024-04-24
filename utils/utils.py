@@ -6,6 +6,20 @@ import math
 def normalize(x):
     return (x - x.min()) / (x.max() - x.min())
 
+def get_outputs(ROOT):
+    score_data = {}
+    ground_truth = None
+
+    paths = os.listdir(ROOT)
+
+    for path in paths:
+        model = path.split("_")[0]
+        if path.endswith('_scores.csv'):
+            score_data[model] = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
+        else:
+            ground_truth = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
+    return score_data, ground_truth
+
 def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
     # Perform the processing for both datasets
     datasets = [data_1.copy(), data_2.copy()]
