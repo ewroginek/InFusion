@@ -22,3 +22,7 @@ If you'd like to improve classification accuracy immediately after model trainin
 
 ```bash
 python run.py
+```
+
+`MajorityRankVoter` uses a majority voting scheme with combinatorial optimization to obtain the best votes (L. I. Kuncheva; Combining Pattern Classifiers: Methods and Algorithms, Wiley
+Interscience, 2004)
