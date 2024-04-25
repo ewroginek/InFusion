@@ -1,10 +1,10 @@
 import numpy as np
 from itertools import combinations
 
-class MajorityRankVoter:
+class JudgeMajorityVote:
     def __init__(self, prediction_vectors, ground_truth=None, use_ground_truth=True):
         """
-        Initialize the MajorityRankVoter with a dictionary of prediction vectors and optionally the ground truth.
+        Initialize the JudgeMajorityVote with a dictionary of prediction vectors and optionally the ground truth.
         
         :param prediction_vectors: dict, where each key is a model identifier and each value is a list of predicted classes
         :param ground_truth: list or None, the actual labels for each instance, optional if use_ground_truth is False
@@ -38,7 +38,7 @@ class MajorityRankVoter:
         correct_predictions = sum(1 for gt, pred in zip(self.ground_truth, combined_output) if gt == pred)
         return correct_predictions / len(self.ground_truth)
 
-    def evaluate_combinations(self):
+    def evaluate_combinations(self, all=False):
         """
         Evaluate all combinations of models starting from combinations of 2.
         
@@ -48,7 +48,7 @@ class MajorityRankVoter:
         keys = list(self.prediction_vectors.keys())
         num_models = len(keys)
 
-        for r in range(2, num_models + 1):
+        for r in range(num_models if all else 2, num_models + 1):
             for combo in combinations(keys, r):
                 predictions = [self.prediction_vectors[key] for key in combo]
                 combined_output = self.majority_vote(predictions)
@@ -60,14 +60,14 @@ class MajorityRankVoter:
 
         return combinations_results
 
-    def recursive_combinations(self):
+    def recursive_combinations(self, all=False):
         current_vectors = self.prediction_vectors.copy()
         iteration = 0
         while True:
             iteration += 1
             print(f"Starting iteration {iteration}")
             self.prediction_vectors = current_vectors
-            results = self.evaluate_combinations()
+            results = self.evaluate_combinations(all)
             sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True) if self.use_ground_truth else results.items()
 
             if not results:
@@ -82,7 +82,8 @@ class MajorityRankVoter:
                 # Update best model if using ground truth
                 self.best_accuracy = sorted_results[0][1]
                 self.best_model = sorted_results[0][0]
-                print(f"Top model at iteration {iteration}: {self.best_model}, Accuracy: {self.best_accuracy:.2f}")
+                # print(f"Top model at iteration {iteration}: {self.best_model}, Accuracy: {self.best_accuracy}")
+                print(f"Accuracy: {self.best_accuracy * 100}")
 
                 # Prepare top 5 new models for the next iteration
                 top_combinations = sorted_results[:5] if self.use_ground_truth else list(results.items())[:5]
@@ -97,31 +98,32 @@ class MajorityRankVoter:
                 break
 
         if self.use_ground_truth:
-            print(f"Final best model: C{iteration-1}{self.best_model}, Best accuracy: {self.best_accuracy:.2f}")
+            # print(f"Final best model: C{iteration-1}{self.best_model}, Best accuracy: {self.best_accuracy}")
+            print(f"Final Accuracy: {self.best_accuracy * 100}")
         else:
             return current_vectors  # Return dictionary of all model combinations without evaluation if not using ground truth
 
 
 # Example usage (assuming we have prediction_vectors and optionally ground_truth defined elsewhere)
-import torch
-# Example usage
-prediction_vectors = {
-    'm1': torch.tensor([0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1]),
-    'm2': torch.tensor([1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1]),
-    'm3': torch.tensor([0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1]),
-    'm4': torch.tensor([1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0]),
-    'm5': torch.tensor([1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0])
-}
-# Correcting the ground truth definition and running the model ensemble
+# import torch
+# # Example usage
+# prediction_vectors = {
+#     'm1': torch.tensor([0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1]),
+#     'm2': torch.tensor([1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1]),
+#     'm3': torch.tensor([0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1]),
+#     'm4': torch.tensor([1, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0]),
+#     'm5': torch.tensor([1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0])
+# }
+# # Correcting the ground truth definition and running the model ensemble
 
-ground_truth = [0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0]  # Complete ground truth vector
+# ground_truth = [0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0]  # Complete ground truth vector
 
-# Create an instance of MajorityRankVoter with ground truth for accuracy evaluation
-ensemble_with_ground_truth = MajorityRankVoter(prediction_vectors, ground_truth, use_ground_truth=True)
-ensemble_with_ground_truth.recursive_combinations()
+# # Create an instance of JudgeMajorityVote with ground truth for accuracy evaluation
+# ensemble_with_ground_truth = JudgeMajorityVote(prediction_vectors, ground_truth, use_ground_truth=True)
+# ensemble_with_ground_truth.recursive_combinations()
 
-# Create an instance of MajorityRankVoter without ground truth to create combinations only
-# ensemble_without_ground_truth = MajorityRankVoter(prediction_vectors_multiclass, use_ground_truth=False)
+# Create an instance of JudgeMajorityVote without ground truth to create combinations only
+# ensemble_without_ground_truth = JudgeMajorityVote(prediction_vectors_multiclass, use_ground_truth=False)
 # combinations_without_ground_truth = ensemble_without_ground_truth.recursive_combinations()
 
 # Print the output from the non-evaluative combinations

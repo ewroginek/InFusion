@@ -10,6 +10,7 @@ def main(args):
     BATCH_SIZE = args.batch_size
     MODEL_TYPE = args.model_type
     weighting_schemes = args.weighting_schemes.split(',')
+    model_selection = args.model_selection
 
     # Validate weighting schemes
     valid_schemes = {'AC', 'WCDS', 'WCP'}
@@ -29,13 +30,12 @@ def main(args):
     # Initialize the correct model based on user input
     if MODEL_TYPE == 'layer':
         model = InFusionLayer(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
+        model.predict()
     elif MODEL_TYPE == 'net':
         model = InFusionNet(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
+        model.predict(model_selection=model_selection)
     else:
         raise ValueError("Invalid model type. Choose 'layer' or 'net'.")
-
-    # Use the selected model for prediction
-    model.predict()
 
     # Print out the elapsed time
     print("Algorithm time:", time.time() - start_time)
@@ -47,6 +47,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
     parser.add_argument('--weighting_schemes', type=str, default='AC,WCDS,WCP', help='Comma-separated list of weighting schemes to use')
     parser.add_argument('--model_type', type=str, default='net', choices=['layer', 'net'], help='Type of model to use (layer or net)')
+    parser.add_argument('--model_selection', type=str, default='ER-Algorithm', choices=['ER-Algorithm', 'Majority Vote'], help='Model selection criteria to use (ER-Algorithm or Majority Vote: InFusionNet only)')
 
     args = parser.parse_args()
     main(args)
