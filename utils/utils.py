@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import os
 import math
+import numpy as np
 
 def normalize(x):
     return (x - x.min()) / (x.max() - x.min())
@@ -82,3 +83,26 @@ def plot_average_rows(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
     # Convert the averages to a pandas DataFrame
     average_rows_df_2 = pd.DataFrame(averages_2)
     plot_rsc(average_rows_df_1, average_rows_df_2, OUTPATH, DATASET_LEN, iteration)
+
+def tensor_indices(tensor_dict, use_argmin=False):
+    """
+    Converts a dictionary of tensors (2D lists) into a dictionary where each tensor
+    is represented as a list of indices of either the maximum or minimum element in each row,
+    based on the use_argmin parameter.
+
+    :param tensor_dict: dict, where keys are identifiers and values are lists of lists (tensors)
+    :param use_argmin: bool, if True, finds the index of the minimum element; if False, finds the index of the maximum element
+    :return: dict, same structure but each list in the tensor is replaced by the index of the min/max element in each row
+    """
+    indices_dict = {}
+    for key, tensor in tensor_dict.items():
+        # Convert list of lists to a numpy array for efficient processing
+        np_tensor = np.array(tensor)
+        # Find the indices of the max or min element in each row based on the use_argmin flag
+        if use_argmin:
+            indices = np.argmin(np_tensor, axis=1)
+        else:
+            indices = np.argmax(np_tensor, axis=1)
+        # Store the result in the dictionary
+        indices_dict[key] = indices.tolist()  # Convert numpy array to list
+    return indices_dict

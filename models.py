@@ -1,9 +1,9 @@
 import torch
-import pandas as pd
-import os
+import numpy as np
 from itertools import combinations
-from utils.utils import plot_average_rows
+from utils.utils import plot_average_rows, tensor_indices
 from rank_score_characteristic import Weighting_Scheme
+from majority_vote import JudgeMajorityVote
 
 class InFusionLayer:
     def __init__(self, score_data, ground_truth, OUTPATH = './results/sklearn_models/lidar_trees_classification_d2', weighting_schemes = ['AC', 'WCDS'], BATCH_SIZE = 2048) -> None:
@@ -189,6 +189,15 @@ class InFusionNet(InFusionLayer):
         self.highest_rank_value_pair = IFL.highest_rank_value_pair
         self.OUTPATH = IFL.OUTPATH
 
+    def majority_vote(self):
+        fusion_scores = tensor_indices(self.fusion_models_sc)
+        fusion_ranks = tensor_indices(self.fusion_models_rc, use_argmin=True)
+        fusion_scores = {"SC_" + key: np.array(value, dtype=np.int64) for key, value in fusion_scores.items()}
+        fusion_ranks = {"RC_" + key: np.array(value, dtype=np.int64) for key, value in fusion_ranks.items()}
+        fusion_dict = {**fusion_scores, **fusion_ranks}
+        ensemble_with_ground_truth = JudgeMajorityVote(fusion_dict, self.ground_truth, use_ground_truth=True)
+        ensemble_with_ground_truth.recursive_combinations(all=True)
+
     def top_k(self, fusion_models, ground_truth, max_val, k=5, scores=True):
         model_accuracies = self.get_accuracies(fusion_models.copy(), ground_truth.copy(), scores)
         top_performers = {key: value for key, value in model_accuracies.items() if value > max_val}
@@ -248,9 +257,12 @@ class InFusionNet(InFusionLayer):
                 break
         return highest_score_value_pair, highest_rank_value_pair
 
-    def predict(self):
-        highest_score_value_pair, highest_rank_value_pair = self.expansion_reduction_1(self.PLOT_AVG_RSC)
-        top_2 = [highest_score_value_pair, highest_rank_value_pair]
-        print(f"End: {max(top_2, key=lambda x: x[1])}")
-        print(f"{max(top_2, key=lambda x: x[1])[1] - self.highest_start}% improvement from base models.")
-        print("Done!")
+    def predict(self, model_selection="ER-Algorithm"):
+        if model_selection == "ER-Algorithm":
+            highest_score_value_pair, highest_rank_value_pair = self.expansion_reduction_1(self.PLOT_AVG_RSC)
+            top_2 = [highest_score_value_pair, highest_rank_value_pair]
+            print(f"End: {max(top_2, key=lambda x: x[1])}")
+            print(f"{max(top_2, key=lambda x: x[1])[1] - self.highest_start}% improvement from base models.")
+            print("Done!")
+        else:
+            self.majority_vote()
