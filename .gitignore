@@ -5,4 +5,4 @@ sklearn_models/
 __pycache__/
 utils/__pycache__/
 *.pyc
-
+ipynb_checkpoints/
