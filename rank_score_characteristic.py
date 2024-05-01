@@ -1,7 +1,11 @@
 import torch
 
 class RankScoreCharacteristic:
-    def rank_score_function(self, x):
+    def __init__(self, regression=False) -> None:
+        self.norm_sort_func = self.rank_score_regression if regression else self.rank_score_classification
+
+    def rank_score_classification(self, x):
+        """For Classification"""
         # Normalize the tensor row-wise between 0 and 1
         min_val = x.min(dim=1, keepdim=True).values
         max_val = x.max(dim=1, keepdim=True).values
@@ -9,6 +13,17 @@ class RankScoreCharacteristic:
 
         # Sort the rows in descending order
         sorted_tensor, _ = torch.sort(normalized_tensor, dim=1, descending=True)
+        return sorted_tensor
+
+    def rank_score_regression(self, x):
+        """For Regression"""
+        # Normalize the tensor between 0 and 1
+        min_val = x.min()
+        max_val = x.max()
+        normalized_tensor = (x - min_val) / (max_val - min_val)
+
+        # Sort the tensor in descending order
+        sorted_tensor, _ = torch.sort(normalized_tensor, descending=True)
         return sorted_tensor
 
     def cognitive_diversity(self, f_A, f_B):
@@ -24,19 +39,20 @@ class RankScoreCharacteristic:
         pairwise_matrix = torch.empty(num_items, num_items, dtype=torch.float)
         for i, T_i in enumerate(T):
             for j, T_j in enumerate(T):
-                f_Ti = self.rank_score_function(data[T_i])
-                f_Tj = self.rank_score_function(data[T_j])
+                f_Ti = self.norm_sort_func(data[T_i])
+                f_Tj = self.norm_sort_func(data[T_j])
                 CD = self.cognitive_diversity(f_Ti, f_Tj)
                 pairwise_matrix[i, j] = CD
-        ds = pairwise_matrix.mean(dim=1) # Mean across columns
+        torch.diagonal(pairwise_matrix)[:] = float('nan')
+        ds = torch.nanmean(pairwise_matrix, dim=0)
 
-        # If you need to return a dictionary mapping each T to its ds value:
+        # Setting up dictionary of model weights
         DS_dict = {T[i]: ds[i].item() for i in range(num_items)}
 
         return DS_dict
 
 class Weighting_Scheme:
-    def __init__(self, scores_batch, ranks_batch, model_accuracies):
+    def __init__(self, scores_batch, ranks_batch, model_accuracies:dict = {}, norm_regression=False):
         self.scores_batch = scores_batch
         self.ranks_batch = ranks_batch
 
@@ -45,7 +61,7 @@ class Weighting_Scheme:
         self.models = scores_batch.keys()
         self.model_accuracies = model_accuracies.copy()
 
-        self.RSC = RankScoreCharacteristic()
+        self.RSC = RankScoreCharacteristic(norm_regression)
 
         # List of Weight Functions
         self.init_functions = {
@@ -63,7 +79,7 @@ class Weighting_Scheme:
                 raise KeyError(f"No function provided for key: {key}")
         return self.values[key]
 
-    # Weight Functions
+    # Weight Functions for creating Model Dictionary of Weights
     def average_combination(self):
         return {m: 1 for m in self.models}
 
