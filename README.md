@@ -21,8 +21,10 @@ python main.py --root './tensor_predictions/' --tensorset 'mnist' --batch_size 1
 If you'd like to improve classification accuracy immediately after model training, you can run the following code to see an example of how this is done using 5 sklearn models trained on the MNIST dataset.
 
 ```bash
-python run.py
+python run_classification.py
 ```
 
 `MajorityRankVoter` uses a majority voting scheme with combinatorial optimization to obtain the best votes (L. I. Kuncheva; Combining Pattern Classifiers: Methods and Algorithms, Wiley
 Interscience, 2004)
+
+If you have regression data, consider using the example in `run_regression.py`. `InFusionRegression` takes a dictionary of vectors and uses different weighting schemes and combination types to produce new models.
