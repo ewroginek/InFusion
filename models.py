@@ -4,6 +4,7 @@ from itertools import combinations
 from utils.utils import plot_average_rows, tensor_indices
 from rank_score_characteristic import Weighting_Scheme
 from majority_vote import JudgeMajorityVote
+from sklearn.metrics import mean_squared_error, r2_score
 
 class InFusionLayer:
     def __init__(self, score_data, ground_truth, OUTPATH = './results/sklearn_models/lidar_trees_classification_d2', weighting_schemes = ['AC', 'WCDS'], BATCH_SIZE = 2048) -> None:
@@ -266,3 +267,83 @@ class InFusionNet(InFusionLayer):
             print("Done!")
         else:
             self.majority_vote()
+
+class InFusionRegression:
+    def __init__(self, score_data, weighting_schemes = ['AC', 'WCDS']) -> None:
+        self.score_tensors = {s: torch.tensor(score_data[s].iloc[:, 0].values, dtype=torch.float32) for s in score_data}
+        # Use the function
+        self.rank_tensors = self.get_tensor_ranks(self.score_tensors)
+
+        # Weight_Schemes = Weighting_Scheme(self.score_tensors, self.rank_tensors)
+        self.weighting_schemes = weighting_schemes
+        self.weighting_schemes = self.weighting_scheme(self.score_tensors, self.rank_tensors)
+
+    def get_combinations(self, models):
+        lengths = [x for x in range(len(models)+1)]
+        combs = []
+        for x in lengths:
+            comb = combinations(models, x)
+            for i in comb:
+                if len(i) > 1: 
+                    combs.append(i)
+        return combs
+
+    def model_fusion(self, data, weights, label, fusion_type, sc=True):
+        model_combination = data.copy()
+        original_models = list(model_combination.keys())
+
+        sum_numerator = torch.zeros_like(next(iter(model_combination.values())))  # Initialize to zeros of same shape as any tensor
+        sum_denominator = 0
+
+        # Iterate over the tensors and their corresponding weights
+        for model, tensor in model_combination.items():
+            if weights[model] == 0: continue
+            w = weights[model] if sc else (1 / weights[model])
+            sum_numerator += tensor * w
+            sum_denominator += w
+        scores = sum_numerator / sum_denominator if sum_denominator != 0 else torch.zeros_like(sum_numerator)
+
+        model_combination[f"{label}_{fusion_type}"] = scores
+        return model_combination
+
+    def get_r2_rmse(self, tensor, G):
+        rmse = mean_squared_error(G, tensor.tolist(), squared=False)
+        r2 = r2_score(G, tensor.tolist())
+        return r2, rmse
+
+    def get_tensor_ranks(self, score_tensor):
+        rank_tensors = {}
+        for key, tensor in score_tensor.items():
+            sorted_indices = torch.argsort(tensor)
+            ranks = torch.argsort(sorted_indices) + 1  # Start ranks from 1 instead of 0
+            rank_tensors[key] = ranks.float()
+        return rank_tensors
+
+    def weighting_scheme(self, scores_batch, ranks_batch):
+        dic = {}
+        Weight_Schemes = Weighting_Scheme(scores_batch, ranks_batch, norm_regression=True)
+        for scheme in self.weighting_schemes:
+            dic[scheme] = Weight_Schemes[scheme]
+        return dic
+
+    def combinatorial_fusion_analysis(self, score_tensors, weighting_schemes):
+        sc, rc = {}, {}
+        for C_TYPE in weighting_schemes:
+            combs = self.get_combinations(list(score_tensors.keys()))
+
+            for comb in combs:
+                label = ''.join(comb)
+                # Select tensors and weights for the current combination
+                scores_batch = {key: score_tensors[key] for key in comb}
+                ranks_batch = {key: self.rank_tensors[key] for key in comb}
+
+                comb_weights = {key: weighting_schemes[C_TYPE][key] for key in comb if key in weighting_schemes[C_TYPE]}
+
+                # Calculate weighted sum of tensors for the current combination
+                sc.update(self.model_fusion(scores_batch, comb_weights, label, C_TYPE, sc=True))
+                rc.update(self.model_fusion(ranks_batch, comb_weights, label, C_TYPE, sc=False))
+        return sc, rc
+
+    def predict(self):
+        sc, rc = self.combinatorial_fusion_analysis(self.score_tensors, self.weighting_schemes)
+        return sc, rc
