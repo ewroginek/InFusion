@@ -21,8 +21,13 @@ class InFusionLayer:
         self.rank_data = rank_data
 
         self.base_models = list(score_data.keys())
-        self.DATASET_LEN = len(ground_truth)
-    
+        
+        try:
+            self.DATASET_LEN = len(ground_truth)
+        except:
+            first_key = next(iter(score_data))  # Gets the first key
+            self.DATASET_LEN = len(score_data[first_key]) 
+
     def get_combinations(self, models):
         lengths = [x for x in range(len(models)+1)]
         combs = []
@@ -140,22 +145,25 @@ class InFusionLayer:
     def predict(self, matrices=False):
         print(f"Data Items: {self.DATASET_LEN}\n")
         score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.score_data.items()}
-
-        base_model_accuracies = self.get_accuracies(score_tensors.copy(), self.ground_truth.copy(), True)
-
-        # Print Accuracies of the Base Models
-        print("Base Models:")
-        for i in base_model_accuracies:
-            print(f"\t{i}: \t{base_model_accuracies[i]}")
-        print()
-
-        self.highest_score_value_pair = max(base_model_accuracies.items(), key=lambda item: item[1])
-        self.highest_start = self.highest_score_value_pair[1]
-        print("Start Top Model:", self.highest_score_value_pair)
-
-        # Initialize Rank Variables using max Score info as base
         rank_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.rank_data.items()}
-        self.highest_rank_value_pair = self.highest_score_value_pair
+
+        if self.ground_truth != None:
+            base_model_accuracies = self.get_accuracies(score_tensors.copy(), self.ground_truth.copy(), True)
+
+            # Print Accuracies of the Base Models
+            print("Base Models:")
+            for i in base_model_accuracies:
+                print(f"\t{i}: \t{base_model_accuracies[i]}")
+            print()
+
+            self.highest_score_value_pair = max(base_model_accuracies.items(), key=lambda item: item[1])
+            self.highest_start = self.highest_score_value_pair[1]
+            print("Start Top Model:", self.highest_score_value_pair)
+
+            # Initialize Rank Variables using max Score info as base
+            self.highest_rank_value_pair = self.highest_score_value_pair
+        else:
+            base_model_accuracies = None
 
         # Check for Tie Ranks
         # for i in rank_tensors:
@@ -268,7 +276,7 @@ class InFusionNet(InFusionLayer):
         else:
             self.majority_vote()
 
-class InFusionRegression:
+class InFusion4Regression:
     def __init__(self, score_data, weighting_schemes = ['AC', 'WCDS']) -> None:
         self.score_tensors = {s: torch.tensor(score_data[s].iloc[:, 0].values, dtype=torch.float32) for s in score_data}
         # Use the function
