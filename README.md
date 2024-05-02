@@ -28,3 +28,5 @@ python run_classification.py
 Interscience, 2004)
 
 If you have regression data, consider using the example in `run_regression.py`. `InFusionRegression` takes a dictionary of vectors and uses different weighting schemes and combination types to produce new models.
+
+If you have no ground truth labels, your problem is an unsupervised learning problem. Consider using the example in `run_unsupervised.py`.
