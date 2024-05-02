@@ -17,8 +17,11 @@ def get_outputs(ROOT):
         model = path.split("_")[0]
         if path.endswith('_scores.csv'):
             score_data[model] = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
-        else:
+        elif path.endswith('.csv'):
             ground_truth = pd.read_csv(f"{ROOT}/{path}").iloc[:,1:]
+        else:
+            continue
+
     return score_data, ground_truth
 
 def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
@@ -41,7 +44,7 @@ def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
         C_TYPE = "Score Combination" if idx == 0 else "Rank Combination"
         
         axes[idx].set_title(f'{C_TYPE}: {len(axes[idx].lines)} models')
-        axes[idx].set_xlabel('Feature Ranks')
+        axes[idx].set_xlabel('Classes/Ranks')
         axes[idx].set_ylabel(f"Normalized Scores")
     
     num_lines = len(axes[idx].lines)

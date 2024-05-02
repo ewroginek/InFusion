@@ -59,7 +59,7 @@ class Weighting_Scheme:
         # Save model names as a list for clarity
         # (scores_batch and ranks_batch model names are the same)
         self.models = scores_batch.keys()
-        self.model_accuracies = model_accuracies.copy()
+        self.model_accuracies = model_accuracies.copy() if model_accuracies != None else None
 
         self.RSC = RankScoreCharacteristic(norm_regression)
 
