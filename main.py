@@ -30,7 +30,7 @@ def main(args):
     # Initialize the correct model based on user input
     if MODEL_TYPE == 'layer':
         model = InFusionLayer(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
-        model.predict(matrices=True)
+        model.predict()
     elif MODEL_TYPE == 'net':
         model = InFusionNet(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
         model.predict(model_selection=model_selection)
