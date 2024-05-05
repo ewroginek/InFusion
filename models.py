@@ -7,7 +7,7 @@ from majority_vote import JudgeMajorityVote
 from sklearn.metrics import mean_squared_error, r2_score
 
 class InFusionLayer:
-    def __init__(self, score_data, ground_truth, OUTPATH = './results/sklearn_models/lidar_trees_classification_d2', weighting_schemes = ['AC', 'WCDS'], BATCH_SIZE = 2048) -> None:
+    def __init__(self, score_data, ground_truth, OUTPATH = './results/sklearn_models/lidar_trees_classification_d2', weighting_schemes = ['AC', 'WC-CDS'], BATCH_SIZE = 2048) -> None:
         self.OUTPATH = OUTPATH
 
         self.weighting_schemes = weighting_schemes
@@ -17,6 +17,7 @@ class InFusionLayer:
 
         self.score_data = score_data
         self.ground_truth = ground_truth
+        self.supervised_learning = False if ground_truth is None else True
         rank_data = {i: score_data[i].rank(axis=1, ascending=False) for i in score_data}
         self.rank_data = rank_data
 
@@ -147,7 +148,7 @@ class InFusionLayer:
         score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.score_data.items()}
         rank_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.rank_data.items()}
 
-        if self.ground_truth != None:
+        if self.supervised_learning:
             base_model_accuracies = self.get_accuracies(score_tensors.copy(), self.ground_truth.copy(), True)
 
             # Print Accuracies of the Base Models
@@ -163,6 +164,7 @@ class InFusionLayer:
             # Initialize Rank Variables using max Score info as base
             self.highest_rank_value_pair = self.highest_score_value_pair
         else:
+            self.highest_start = None
             base_model_accuracies = None
 
         # Check for Tie Ranks
@@ -277,7 +279,7 @@ class InFusionNet(InFusionLayer):
             self.majority_vote()
 
 class InFusion4Regression:
-    def __init__(self, score_data, weighting_schemes = ['AC', 'WCDS']) -> None:
+    def __init__(self, score_data, weighting_schemes = ['AC', 'WC-CDS']) -> None:
         self.score_tensors = {s: torch.tensor(score_data[s].iloc[:, 0].values, dtype=torch.float32) for s in score_data}
         # Use the function
         self.rank_tensors = self.get_tensor_ranks(self.score_tensors)

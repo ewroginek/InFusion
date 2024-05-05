@@ -13,7 +13,7 @@ def main(args):
     model_selection = args.model_selection
 
     # Validate weighting schemes
-    valid_schemes = {'AC', 'WCDS', 'WCP'}
+    valid_schemes = {'AC', 'WC-CDS', 'WC-KDS', 'WCP'}
     if not all(scheme in valid_schemes for scheme in weighting_schemes):
         raise ValueError(f"Invalid weighting scheme. Choose from: {', '.join(valid_schemes)}")
 
@@ -30,7 +30,7 @@ def main(args):
     # Initialize the correct model based on user input
     if MODEL_TYPE == 'layer':
         model = InFusionLayer(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
-        model.predict(matrices=True)
+        model.predict()
     elif MODEL_TYPE == 'net':
         model = InFusionNet(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
         model.predict(model_selection=model_selection)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     parser.add_argument('--root', type=str, default='./sklearn_models/', help='Root directory for saving models')
     parser.add_argument('--tensorset', type=str, default='mnist', help='Tensor outputs to be used')
     parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
-    parser.add_argument('--weighting_schemes', type=str, default='AC,WCDS,WCP', help='Comma-separated list of weighting schemes to use')
+    parser.add_argument('--weighting_schemes', type=str, default='AC,WC-CDS,WC-KDS,WCP', help='Comma-separated list of weighting schemes to use')
     parser.add_argument('--model_type', type=str, default='net', choices=['layer', 'net'], help='Type of model to use (layer or net)')
     parser.add_argument('--model_selection', type=str, default='ER-Algorithm', choices=['ER-Algorithm', 'Majority Vote'], help='Model selection criteria to use (ER-Algorithm or Majority Vote: InFusionNet only)')
 

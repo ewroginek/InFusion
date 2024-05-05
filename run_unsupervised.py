@@ -13,7 +13,7 @@ def main(args):
     model_selection = args.model_selection
 
     # Validate weighting schemes
-    valid_schemes = {'AC', 'WCDS'}
+    valid_schemes = {'AC', 'WC-CDS'}
     if not all(scheme in valid_schemes for scheme in weighting_schemes):
         raise ValueError(f"Invalid weighting scheme. Choose from: {', '.join(valid_schemes)}")
 

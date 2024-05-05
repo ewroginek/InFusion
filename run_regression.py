@@ -1,4 +1,4 @@
-from models import InFusionRegression
+from models import InFusion4Regression
 from utils.utils import get_outputs
 import pandas as pd
 import seaborn as sns
@@ -18,9 +18,9 @@ score_data, ground_truth = get_outputs(f"{ROOT}/{DATASET}")
 T = score_data
 G = list(ground_truth['0'])
 
-infuse_regression = InFusionRegression(T, weighting_schemes=['AC', 'WCDS'])
+infuse_regression = InFusion4Regression(T, weighting_schemes=['AC', 'WC-CDS', 'WC-KDS'])
 score_combinations, rank_combinations = infuse_regression.predict()
-print(score_combinations)
+# print(score_combinations)
 data = []
 
 # Collect data from score combinations
@@ -32,13 +32,13 @@ for M in score_combinations:
 
 # Collect data from rank combinations
 # for M in rank_combinations:
-    # C = 'RC' if M not in base_models else 'Base'
+#     C = 'RC' if M not in base_models else 'Base'
 #     r2, rmse = infuse_regression.get_r2_rmse(rank_combinations[M], G)
 #     data.append({'Model': f'{C}_{M}', 'R2': r2, 'RMSE': rmse, 'Type': 'RC'})
 
 # Create a DataFrame
 df = pd.DataFrame(data)
-
+print(df)
 # Set the aesthetics for the plots
 sns.set(style="whitegrid")
 
