@@ -1,5 +1,4 @@
 import torch
-from scipy.stats import norm
 
 class RankScoreCharacteristic:
     def __init__(self, regression=False) -> None:
@@ -31,48 +30,42 @@ class RankScoreCharacteristic:
         N = (len(f_A))
         return torch.sqrt(torch.sum((f_A - f_B)**2)/N)
 
-    def ksi_correlation(self, x, y):
+    def ksi_dissimilarity(self, f_A, f_B):
         """
-        Calculates the ξ-coefficient as described in:
+        Uses the ξ-correlation coefficient and returns a statistical dissimilarity of two functions. f_A and f_B are matrices
+        
+        ξ-correlation coefficient is described in:
 
         Chatterjee, S. (2021). A new coefficient of correlation. Journal of the American Statistical Association, 116(536), 2009-2022.
         """
 
-        # Move tensors to GPU if available
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        x = x.to(device).flatten().float()
-        y = y.to(device).flatten().float()
-        n = y.size(0)
+        f_A = f_A.flatten().float()
+        f_B = f_B.flatten().float()
+        N = f_B.size(0)
 
-        if x.size(0) != n:
-            raise ValueError("x and y must have the same length.")
-
-        sort_index = torch.argsort(x)
-        y_sorted = y[sort_index]
-        r = torch.argsort(torch.argsort(y_sorted)).float() + 1  # rankdata equivalent
-        nominator = torch.sum(torch.abs(torch.diff(r)))
+        sort_index = torch.argsort(f_A)
+        f_B_sorted = f_B[sort_index]
+        ranks = torch.argsort(torch.argsort(f_B_sorted)).float() + 1
+        nominator = torch.sum(torch.abs(torch.diff(ranks)))
 
         # Check for tie rankings
-        ties = len(torch.unique(y)) < n
+        ties = len(torch.unique(f_B)) < N
 
         if ties:
-            l = torch.argsort(torch.argsort(y_sorted, descending=True)).float() + 1  # max ranks
-            denominator = 2 * torch.sum(l * (n - l))
-            nominator *= n
+            l = torch.argsort(torch.argsort(f_B_sorted, descending=True)).float() + 1  # max ranks
+            denominator = 2 * torch.sum(l * (N - l))
+            nominator *= N
         else:
-            denominator = n**2 - 1
+            denominator = N**2 - 1
             nominator *= 3
 
-        statistic = 1 - nominator / denominator
-        # p_value = norm.sf(statistic.item(), scale=2 / 5 / torch.sqrt(torch.tensor(n)).item())  # Use scipy for p-value
-
-        return statistic #.cpu().numpy()#, p_value
+        return nominator / denominator
 
     def diversity_strength(self, data, corr="CD"):
         # Assuming data is a dictionary of tensors: {'T1': tensor1, 'T2': tensor2, ...}
         T = list(data.keys())
         num_items = len(T)
-        diversity = self.cognitive_diversity if corr == "CD" else self.ksi_correlation
+        diversity = self.cognitive_diversity if corr == "CD" else self.ksi_dissimilarity
         
         # Initialize an empty tensor for results; shape [num_items, num_items]
         pairwise_matrix = torch.empty(num_items, num_items, dtype=torch.float)
@@ -82,12 +75,13 @@ class RankScoreCharacteristic:
                 f_Tj = self.norm_sort_func(data[T_j])
                 CD = diversity(f_Ti, f_Tj)
                 pairwise_matrix[i, j] = CD
+        
+        # Obtain diversity strength by taking row-wise means by omitting diagonal values
         torch.diagonal(pairwise_matrix)[:] = float('nan')
         ds = torch.nanmean(pairwise_matrix, dim=0)
 
         # Setting up dictionary of model weights
         DS_dict = {T[i]: ds[i].item() for i in range(num_items)}
-
         return DS_dict
 
 class Weighting_Scheme:
