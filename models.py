@@ -227,13 +227,17 @@ class InFusionNet(InFusionLayer):
 
             # Scores
             top_5_sc_models = self.top_k(fusion_models_sc, self.ground_truth, max_s_val, self.K, True)
+            # print("top5 sc:", top_5_sc_models.keys())
+            top_5_sc_models = {f'(SC_{key})': value for key, value in top_5_sc_models.items()}
 
             # Ranks
             top_5_rc_models = self.top_k(fusion_models_rc, self.ground_truth, max_r_val, self.K, False)
+            # print("top5 rc:", top_5_rc_models.keys())
+            top_5_rc_models = {f'(RC_{key})': value for key, value in top_5_rc_models.items()}
 
             # Pool SC & RC Models
-            combined = {f'SC_{key}': value for key, value in top_5_sc_models.items()}
-            combined.update({f'RC_{key}': value for key, value in top_5_rc_models.items()})
+            combined = top_5_sc_models
+            combined.update(top_5_rc_models)
             top_k = sorted(combined.items(), key=lambda item: item[1], reverse=True)[:self.K]
             
             # Termination condition
@@ -251,8 +255,9 @@ class InFusionNet(InFusionLayer):
             score_tensors = {}
             rank_tensors = {}
             for model in self.base_models:
-                M = model[3:] # normalize the ranks for scores if using rank-scores
-                score_tensors[model] = fusion_models_sc[M] if model[:2] == "SC" else self.rank_norm(fusion_models_rc[M])
+                print(model)
+                M = model[4:] # normalize the ranks for scores if using rank-scores
+                score_tensors[model] = fusion_models_sc[M[:-1]] if model[:3] == "(SC" else self.rank_norm(fusion_models_rc[M[:-1]])
                 sorted_indices = score_tensors[model].argsort(dim=1, descending=True)
                 ranks = sorted_indices.argsort(dim=1).float()
                 rank_tensors[model] = ranks + 1
