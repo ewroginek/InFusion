@@ -24,7 +24,7 @@ def get_outputs(ROOT):
 
     return score_data, ground_truth
 
-def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
+def plot_average_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
     # Perform the processing for both datasets
     datasets = [data_1.copy(), data_2.copy()]
     fig, axes = plt.subplots(1, 2, figsize=(20, 8))  # Create 1 row and 2 columns of subplots
@@ -57,6 +57,48 @@ def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
     plt.savefig(f'{OUTPATH}/Avg RSC Iteration-{iteration}.png')
     plt.close()
 
+def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
+    # Perform the processing for both datasets
+    datasets = [data_1.copy(), data_2.copy()]
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))  # Create 1 row and 2 columns of subplots
+    
+    for idx, scores in enumerate(datasets):
+        ranks = scores.rank(ascending=False)
+        labels = list(scores.keys())
+        
+        models = labels if iteration == 0 else [f"M{i}" for i in range(len(labels))]
+
+        for x, i in enumerate(labels):
+            s_i_score = sorted(normalize(scores[i]), reverse=True)  # Assuming normalize is defined elsewhere
+            s_i_rank = sorted(ranks[i], reverse=False)
+            axes[idx].plot(s_i_rank, s_i_score, label=models[x])
+        axes[idx].grid(True)
+        # axes[idx].legend(loc='upper left', bbox_to_anchor=(1, 1))
+        
+        if iteration == 0:
+            C_TYPE = "Scores" if idx == 0 else "Ranks"
+        else:
+            C_TYPE = "Score Combination" if idx == 0 else "Rank Combination"
+        
+        axes[idx].set_title(f'{C_TYPE}: {len(axes[idx].lines)} models')
+        axes[idx].set_xlabel('Class Ranks')
+        axes[idx].set_ylabel(f"Normalized Scores")
+    
+    # Add legend only for iteration 0
+    if iteration == 0:
+        for ax in axes:
+            ax.legend(loc='upper left', bbox_to_anchor=(1.05, 1), borderaxespad=0.)
+
+    num_lines = len(axes[idx].lines)
+    plural = 's ' if num_lines > 1 else ' '
+    plt.suptitle(f'Rank-Score Characteristics', fontsize=20)
+    plt.figtext(0.5, 0.01, f"Iteration {iteration}", ha="center", fontsize=16)
+    plt.tight_layout()
+
+    n = len(os.listdir(f'{OUTPATH}'))
+    plt.savefig(f'{OUTPATH}/RSC Iteration-{iteration}.png')
+    plt.close()
+
 def plot_fusion_model_accuracies(results, max_original, title):
     models = [f"M{i}" for i in range(len(results))]
     plt.bar(models, list(results.values()))
@@ -69,23 +111,41 @@ def plot_fusion_model_accuracies(results, max_original, title):
     plt.show()
     plt.close()
 
-def plot_average_rows(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
-    averages_1 = {}
-    for key, tensor in data_1.items():
-        # Compute the average across rows (dimension 0) for the tensor
-        row_average = tensor.mean(dim=0).numpy()  # Assuming the tensor is 2D and on CPU
-        averages_1[key] = row_average  # Store the average directly
-    average_rows_df_1 = pd.DataFrame(averages_1)
+# def plot_average_rows(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
+#     averages_1 = {}
+#     for key, tensor in data_1.items():
+#         # Compute the average across rows (dimension 0) for the tensor
+#         row_average = tensor.mean(dim=0).numpy()  # Assuming the tensor is 2D and on CPU
+#         averages_1[key] = row_average  # Store the average directly
+#     average_rows_df_1 = pd.DataFrame(averages_1)
     
-    averages_2 = {}
-    for key, tensor in data_2.items():
-        # Compute the average across rows (dimension 0) for the tensor
-        row_average = tensor.mean(dim=0).numpy()  # Assuming the tensor is 2D and on CPU
-        averages_2[key] = row_average  # Store the average directly
+#     averages_2 = {}
+#     for key, tensor in data_2.items():
+#         # Compute the average across rows (dimension 0) for the tensor
+#         row_average = tensor.mean(dim=0).numpy()  # Assuming the tensor is 2D and on CPU
+#         averages_2[key] = row_average  # Store the average directly
 
-    # Convert the averages to a pandas DataFrame
-    average_rows_df_2 = pd.DataFrame(averages_2)
-    plot_rsc(average_rows_df_1, average_rows_df_2, OUTPATH, DATASET_LEN, iteration)
+#     # Convert the averages to a pandas DataFrame
+#     average_rows_df_2 = pd.DataFrame(averages_2)
+#     plot_rsc(average_rows_df_1, average_rows_df_2, OUTPATH, DATASET_LEN, iteration)
+
+def plot_average_rows(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
+    selected_rows_1 = {}
+    for key, tensor in data_1.items():
+        # Select the first row (or any specific row) from the tensor
+        selected_row = tensor[0].numpy()  # Assuming the tensor is 2D and on CPU
+        selected_rows_1[key] = selected_row  # Store the selected row directly
+    selected_rows_df_1 = pd.DataFrame(selected_rows_1)
+    
+    selected_rows_2 = {}
+    for key, tensor in data_2.items():
+        # Select the first row (or any specific row) from the tensor
+        selected_row = tensor[0].numpy()  # Assuming the tensor is 2D and on CPU
+        selected_rows_2[key] = selected_row  # Store the selected row directly
+
+    # Convert the selected rows to a pandas DataFrame
+    selected_rows_df_2 = pd.DataFrame(selected_rows_2)
+    plot_rsc(selected_rows_df_1, selected_rows_df_2, OUTPATH, DATASET_LEN, iteration)
 
 def tensor_indices(tensor_dict, use_argmin=False):
     """
@@ -188,7 +248,7 @@ def plot_model_performance(OUTPATH, csv_file_path, A , B, C, D, E):
             plt.Line2D([0], [0], color='green', lw=4, label='Base Model')
         ]
         plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-        
+
         # Add a black dashed horizontal line at the top performing value among important models
         plt.axhline(y=top_performing_value, color='black', linestyle='--')
 
