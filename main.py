@@ -32,6 +32,7 @@ def main(args):
         model = InFusionLayer(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
         model.predict()
     elif MODEL_TYPE == 'net':
+        # print(score_data, ground_truth)
         model = InFusionNet(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
         model.predict(model_selection=model_selection)
     else:

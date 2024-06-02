@@ -3,3 +3,5 @@ results/
 sklearn_models/
 __pycache__/
 examples/__pycache__
+wordnet/
+3D CNNs/

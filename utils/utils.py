@@ -109,3 +109,96 @@ def tensor_indices(tensor_dict, use_argmin=False):
         # Store the result in the dictionary
         indices_dict[key] = indices.tolist()  # Convert numpy array to list
     return indices_dict
+
+def plot_model_performance(OUTPATH, csv_file_path, A , B, C, D, E):
+    df = pd.read_csv(csv_file_path)
+
+    # Mapping old names to new simplified names
+    def simplify_name(name):
+        return name.replace(A, "A")\
+                   .replace(B, "B")\
+                   .replace(C, "C")\
+                   .replace(D, "D")\
+                   .replace(E, "E")
+
+    # Simplify model names
+    df["Model"] = df["Model"].apply(simplify_name)
+    
+    # Set rank values to 0 if the model name is just "A", "B", "C", "D", or "E"
+    important_models = ["A", "B", "C", "D", "E"]
+    df.loc[df["Model"].isin(important_models), "RC"] = df["SC"]
+    
+    top_performing_value = df[df["Model"].isin(important_models)][["SC"]].max().max()
+
+    # Determine the lowest value in the data and set the bottom range of the y-axis
+    lowest_value = df[["SC"]].min().min()
+    bottom_y_value = lowest_value - 10
+
+    # Dictionary to map categories to titles
+    category_titles = {
+        "_AC": "Average Combination",
+        "_WCP": "Weighted Combination by Performance",
+        "_WC-CDS": "Weighted Combination by Cognitive Diversity Strength",
+        "_WC-KDS": "Weighted Combination by Ksi Diversity Strength"
+    }
+
+    # Function to plot the graph for each category
+    def plot_category(category):
+        filtered_df = df[df["Model"].str.endswith(category) | df["Model"].isin(important_models)]
+        
+        plt.figure(figsize=(18, 10))
+
+        bar_width = 0.35
+        index = range(len(filtered_df))
+
+        bars1 = plt.bar(index, filtered_df["SC"], width=bar_width, color='blue', label='Score Combination')
+        bars2 = plt.bar([i + bar_width for i in index], filtered_df["RC"], width=bar_width, color='red', label='Rank Combination')
+
+        # Change the color of important models to green
+        for i, model in enumerate(filtered_df["Model"]):
+            if model in important_models:
+                bars1[i].set_color('green')
+                bars2[i].set_color('green')
+
+        # Simplify the x-axis labels by removing everything after and including "_"
+        x_labels = [label.split("_")[0] for label in filtered_df["Model"]]
+
+        # Add labels
+        plt.xlabel('Models', fontweight='bold')
+        plt.ylabel('Accuracies', fontweight='bold')
+        DATASET = OUTPATH.split("/")[-1]
+        plt.title(f'{DATASET}\n{category_titles[category]}', fontweight='bold')
+
+        # Adjust xticks to be at the center of grouped bars
+        plt.xticks([i + bar_width / 2 for i in index], x_labels, rotation=90, ha='center')
+
+        # Set y-axis limits
+        plt.ylim(bottom=bottom_y_value, top=100)
+
+        # Bold important models
+        for i, label in enumerate(plt.gca().get_xticklabels()):
+            if filtered_df.iloc[i]["Model"] in important_models:
+                label.set_fontweight('bold')
+                label.set_color('green')  # Change color to indicate importance
+
+        # Create legend
+        legend_elements = [
+            plt.Line2D([0], [0], color='blue', lw=4, label='Score Combination'),
+            plt.Line2D([0], [0], color='red', lw=4, label='Rank Combination'),
+            plt.Line2D([0], [0], color='green', lw=4, label='Base Model')
+        ]
+        plt.legend(handles=legend_elements, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+        
+        # Add a black dashed horizontal line at the top performing value among important models
+        plt.axhline(y=top_performing_value, color='black', linestyle='--')
+
+        # Adjust layout to increase distance between x-axis ticks
+        plt.tight_layout()
+
+        # Display the graph
+        plt.savefig(f"{OUTPATH}/{category_titles[category]}.png")
+    
+    # Plot each category
+    categories = ["_AC", "_WC-KDS", "_WCP", "_WC-CDS"]
+    for category in categories:
+        plot_category(category)
