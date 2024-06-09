@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import math
 import numpy as np
+from itertools import combinations
 
 def normalize(x):
     return (x - x.min()) / (x.max() - x.min())
@@ -76,7 +77,7 @@ def plot_rsc(data_1, data_2, OUTPATH, DATASET_LEN, iteration):
         # axes[idx].legend(loc='upper left', bbox_to_anchor=(1, 1))
         
         if iteration == 0:
-            C_TYPE = "Scores" if idx == 0 else "Ranks"
+            C_TYPE = "Rank-Score Characteristics" if idx == 0 else "Rank-RankScore Characteristics"
         else:
             C_TYPE = "Score Combination" if idx == 0 else "Rank Combination"
         
@@ -170,7 +171,7 @@ def tensor_indices(tensor_dict, use_argmin=False):
         indices_dict[key] = indices.tolist()  # Convert numpy array to list
     return indices_dict
 
-def plot_model_performance(OUTPATH, csv_file_path, A , B, C, D, E):
+def plot_model_performance_histogram(OUTPATH, csv_file_path, A , B, C, D, E):
     df = pd.read_csv(csv_file_path)
 
     # Mapping old names to new simplified names
@@ -258,6 +259,131 @@ def plot_model_performance(OUTPATH, csv_file_path, A , B, C, D, E):
         # Display the graph
         plt.savefig(f"{OUTPATH}/{category_titles[category]}.png")
     
+    # Plot each category
+    categories = ["_AC", "_WC-KDS", "_WCP", "_WC-CDS"]
+    for category in categories:
+        plot_category(category)
+
+
+def plot_model_performance(OUTPATH, csv_file_path, A, B, C, D, E):
+    """
+    Plot model combination results in the same manner as shown in Yang et al. (2005)
+    """
+    df = pd.read_csv(csv_file_path)
+
+    # Mapping old names to new simplified names
+    def simplify_name(name):
+        return name.replace(A, "A")\
+                   .replace(B, "B")\
+                   .replace(C, "C")\
+                   .replace(D, "D")\
+                   .replace(E, "E")
+
+    # Simplify model names
+    df["Model"] = df["Model"].apply(simplify_name)
+
+    # Set rank values to be equal to "SC" if the model name is just "A", "B", "C", "D", or "E"
+    important_models = ["A", "B", "C", "D", "E"]
+    df.loc[df["Model"].isin(important_models), "RC"] = df["SC"]
+
+    top_performing_value = df[df["Model"].isin(important_models)][["SC"]].max().max()
+
+    # Determine the lowest value in the data and set the bottom range of the y-axis
+    lowest_value = df[["SC"]].min().min()
+    bottom_y_value = lowest_value - 10
+
+    # Dictionary to map categories to titles
+    category_titles = {
+        "_AC": "Average Combination",
+        "_WCP": "Weighted Combination by Performance",
+        "_WC-CDS": "Weighted Combination by Cognitive Diversity Strength",
+        "_WC-KDS": "Weighted Combination by Ksi Diversity Strength"
+    }
+
+    # Function to generate combinations and sort them by RC values
+    def get_sorted_combinations(group_size):
+        comb_data = []
+        combs = combinations(important_models, group_size)
+        for comb in combs:
+            comb_str = ''.join(comb)
+            model_name = f"{comb_str}{category}"
+            if model_name in filtered_df["Model"].values:
+                rc_value = filtered_df[filtered_df["Model"] == model_name]["RC"].values[0]
+                sc_value = filtered_df[filtered_df["Model"] == model_name]["SC"].values[0]
+                comb_data.append((comb_str, sc_value, rc_value))
+            elif comb_str in important_models:  # Check if it's an important model without suffix
+                if comb_str in filtered_df["Model"].values:
+                    rc_value = filtered_df[filtered_df["Model"] == comb_str]["RC"].values[0]
+                    sc_value = filtered_df[filtered_df["Model"] == comb_str]["SC"].values[0]
+                    comb_data.append((comb_str, sc_value, rc_value))
+        comb_data.sort(key=lambda x: x[2])  # Sort by RC values
+        return comb_data
+
+    # Function to plot the graph for each category
+    def plot_category(category):
+        global filtered_df
+        filtered_df = df[df["Model"].str.endswith(category) | df["Model"].isin(important_models)]
+
+        plt.figure(figsize=(18, 10))
+
+        all_x_labels = []
+        all_sc_values = []
+        all_rc_values = []
+        group_boundaries = []
+
+        # Generate and sort combinations for each group size
+        for group_size in range(1, len(important_models) + 1):
+            sorted_combinations = get_sorted_combinations(group_size)
+            if sorted_combinations:
+                all_x_labels.extend([item[0] for item in sorted_combinations])
+                all_sc_values.extend([item[1] for item in sorted_combinations])
+                all_rc_values.extend([item[2] for item in sorted_combinations])
+                group_boundaries.append(len(all_x_labels) - 0.5)
+
+        # Plot the scores and ranks as line graphs
+        plt.plot(all_x_labels, all_sc_values, marker='o', linestyle='-', color='blue', label='Score Combination')
+        plt.plot(all_x_labels, all_rc_values, marker='x', linestyle='-', color='red', label='Rank Combination')
+
+        # Add vertical dashed lines at group boundaries
+        for boundary in group_boundaries[:-1]:  # Exclude the last boundary as it is at the end of the plot
+            plt.axvline(x=boundary, color='black', linestyle='--')
+
+        # Add labels
+        plt.xlabel('Model Combinations', fontweight='bold', fontsize=16)
+        plt.ylabel('Accuracies', fontweight='bold', fontsize=18)
+        DATASET = OUTPATH.split("/")[-1]
+        plt.title(f'{DATASET}\n{category_titles[category]}', fontweight='bold', fontsize=20)
+
+        # Set y-axis limits
+        plt.ylim(bottom=bottom_y_value, top=100)
+
+        # Set x-axis limits to ensure the first/last tick is the same distance as between two ticks
+        plt.xlim(-0.5, len(all_x_labels) - 0.5)
+
+        # Rotate x-axis labels and set font size
+        plt.xticks(rotation=90, fontsize=16)
+        plt.yticks(fontsize=16)
+
+        # Bold important models
+        for tick_label in plt.gca().get_xticklabels():
+            if tick_label.get_text() in important_models:
+                tick_label.set_fontweight('bold')
+                tick_label.set_color('green')  # Change color to indicate importance
+
+        # Create legend with larger font size
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0., fontsize=18)
+
+        # Add a black dashed horizontal line at the top performing value among important models
+        plt.axhline(y=top_performing_value, color='black', linestyle='--')
+
+        # Adjust layout to increase distance between x-axis ticks
+        plt.tight_layout()
+        plt.grid(True)
+
+        # Save the graph
+        plt.savefig(f"{OUTPATH}/{category_titles[category]}.png")
+        plt.close()
+
     # Plot each category
     categories = ["_AC", "_WC-KDS", "_WCP", "_WC-CDS"]
     for category in categories:
