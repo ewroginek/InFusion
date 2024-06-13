@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from itertools import combinations
-from utils.utils import plot_average_rows, tensor_indices
+from utils.utils import plot_average_rows, tensor_indices, plot_model_performance
 from rank_score_characteristic import Weighting_Scheme
 from majority_vote import JudgeMajorityVote
 from sklearn.metrics import mean_squared_error, r2_score
@@ -57,6 +57,7 @@ class InFusionLayer:
                 sum_numerator += model_combination[model] * w
                 sum_denominator += w
             scores = sum_numerator / sum_denominator
+            
             model_combination[f"{label}_{fusion_type}"] = self.normalize(scores) if sc else scores
 
         if sc:
@@ -147,7 +148,11 @@ class InFusionLayer:
         print(f"Data Items: {self.DATASET_LEN}\n")
         score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.score_data.items()}
         rank_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.rank_data.items()}
-
+        
+        # for row in rank_tensors['C']:
+        #     print(row.T)
+        #     break
+        
         if self.supervised_learning:
             base_model_accuracies = self.get_accuracies(score_tensors.copy(), self.ground_truth.copy(), True)
 
@@ -178,10 +183,36 @@ class InFusionLayer:
         if matrices:
             return fusion_models_sc, fusion_models_rc
         else:
-            max_s_val = self.highest_score_value_pair[1]
+            max_s_val = self.highest_start
             max_r_val = max_s_val
-            self.highest_score_value_pair, max_s_val = self.update_max(fusion_models_sc, self.highest_score_value_pair, max_s_val)
-            self.highest_rank_value_pair, max_r_val = self.update_max(fusion_models_rc, self.highest_rank_value_pair, max_r_val)
+
+            model_accuracies = self.get_accuracies(fusion_models_sc.copy(), self.ground_truth.copy(), True)
+            topk_s_models = dict(sorted(model_accuracies.items(), key=lambda x: x[1], reverse=False)[:])
+            top_k_sc_models = {f'(SC_{key})': value for key, value in topk_s_models.items()}
+            
+            model_accuracies = self.get_accuracies(fusion_models_rc.copy(), self.ground_truth.copy(), False)
+            topk_r_models = dict(sorted(model_accuracies.items(), key=lambda x: x[1], reverse=False)[:])
+            top_k_rc_models = {f'(RC_{key})': value for key, value in topk_r_models.items()}
+
+            import pandas as pd
+            models = [key.replace("(SC_", "").replace(")", "") for key in top_k_sc_models.keys()]
+            sc_values = list(top_k_sc_models.values())
+            rc_values = list(top_k_rc_models.values())
+
+            # Create a DataFrame
+            df = pd.DataFrame({
+                "Model": models,
+                "SC": sc_values,
+                "RC": rc_values
+            })
+
+            # Save to CSV
+            csv_filename = f"{self.OUTPATH}/models_performance_0.csv"
+            df.to_csv(csv_filename, index=False)
+            plot_model_performance(f"{self.OUTPATH}", csv_filename, *self.base_models)
+
+            self.highest_score_value_pair, max_s_val = self.update_max(top_k_sc_models, self.highest_score_value_pair, max_s_val)
+            self.highest_rank_value_pair, max_r_val = self.update_max(top_k_rc_models, self.highest_rank_value_pair, max_r_val)
             top_2 = [self.highest_score_value_pair, self.highest_rank_value_pair]
             print(f"End Top Model: {max(top_2, key=lambda x: x[1])}\n")
             print(f"{max(top_2, key=lambda x: x[1])[1] - self.highest_start}% improvement from base models.")
@@ -194,6 +225,7 @@ class InFusionNet(InFusionLayer):
         IFL = InFusionLayer(score_data, ground_truth, OUTPATH, weighting_schemes = weighting_schemes, BATCH_SIZE = BATCH_SIZE)
 
         self.fusion_models_sc, self.fusion_models_rc = IFL.predict(matrices=True)
+        self.fixed_base_models = IFL.base_models
         self.ground_truth = IFL.ground_truth
         self.highest_start = IFL.highest_start
         self.highest_score_value_pair = IFL.highest_score_value_pair 
@@ -239,7 +271,7 @@ class InFusionNet(InFusionLayer):
             combined = top_5_sc_models
             combined.update(top_5_rc_models)
             top_k = sorted(combined.items(), key=lambda item: item[1], reverse=True)[:self.K]
-            
+
             # Termination condition
             if len(top_k) == 0: break
 
@@ -255,7 +287,7 @@ class InFusionNet(InFusionLayer):
             score_tensors = {}
             rank_tensors = {}
             for model in self.base_models:
-                print(model)
+                print(f"{model}: {model_accuracies[model]}")
                 M = model[4:] # normalize the ranks for scores if using rank-scores
                 score_tensors[model] = fusion_models_sc[M[:-1]] if model[:3] == "(SC" else self.rank_norm(fusion_models_rc[M[:-1]])
                 sorted_indices = score_tensors[model].argsort(dim=1, descending=True)

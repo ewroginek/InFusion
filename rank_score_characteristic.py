@@ -28,7 +28,7 @@ class RankScoreCharacteristic:
 
     def cognitive_diversity(self, f_A, f_B):
         N = (len(f_A))
-        return torch.sqrt(torch.sum((f_A - f_B)**2)/N)
+        return torch.sqrt(torch.sum((f_A - f_B)**2)/N) #-1
 
     def ksi_dissimilarity(self, f_A, f_B):
         """
