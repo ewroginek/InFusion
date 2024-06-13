@@ -29,8 +29,13 @@ def main(args):
 
     # Initialize the correct model based on user input
     if MODEL_TYPE == 'layer':
+        # Supervised
         model = InFusionLayer(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
-        model.predict()
+        model.predict(matrices=True)
+        
+        # Unsupervised
+        # model = InFusionLayer(score_data=score_data, ground_truth=None, OUTPATH = OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
+        # model.predict(matrices=True)
     elif MODEL_TYPE == 'net':
         # print(score_data, ground_truth)
         model = InFusionNet(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)

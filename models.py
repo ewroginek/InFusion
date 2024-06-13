@@ -57,6 +57,7 @@ class InFusionLayer:
                 sum_numerator += model_combination[model] * w
                 sum_denominator += w
             scores = sum_numerator / sum_denominator
+            
             model_combination[f"{label}_{fusion_type}"] = self.normalize(scores) if sc else scores
 
         if sc:
@@ -147,7 +148,11 @@ class InFusionLayer:
         print(f"Data Items: {self.DATASET_LEN}\n")
         score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.score_data.items()}
         rank_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.rank_data.items()}
-
+        
+        # for row in rank_tensors['C']:
+        #     print(row.T)
+        #     break
+        
         if self.supervised_learning:
             base_model_accuracies = self.get_accuracies(score_tensors.copy(), self.ground_truth.copy(), True)
 
