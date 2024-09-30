@@ -3,6 +3,7 @@ import torch
 class RankScoreCharacteristic:
     def __init__(self, regression=False) -> None:
         self.norm_sort_func = self.rank_score_regression if regression else self.rank_score_classification
+        self.ds_batch = {}
 
     def rank_score_classification(self, x):
         """For InFusionLayer and InFusionNet"""
@@ -27,7 +28,7 @@ class RankScoreCharacteristic:
         return sorted_tensor
 
     def cognitive_diversity(self, f_A, f_B):
-        N = (len(f_A))
+        N = (len(f_A[0]))
         return torch.sqrt(torch.sum((f_A - f_B)**2)/N) #-1
 
     def ksi_dissimilarity(self, f_A, f_B):
@@ -67,34 +68,37 @@ class RankScoreCharacteristic:
         num_items = len(T)
         diversity = self.cognitive_diversity if corr == "CD" else self.ksi_dissimilarity
         
+        # print(data)
         # Initialize an empty tensor for results; shape [num_items, num_items]
         pairwise_matrix = torch.empty(num_items, num_items, dtype=torch.float)
         for i, T_i in enumerate(T):
             for j, T_j in enumerate(T):
-                f_Ti = self.norm_sort_func(data[T_i])
-                f_Tj = self.norm_sort_func(data[T_j])
+                f_Ti = self.norm_sort_func(data[T_i][:1])
+                f_Tj = self.norm_sort_func(data[T_j][:1])
                 CD = diversity(f_Ti, f_Tj)
                 pairwise_matrix[i, j] = CD
-        
         # Obtain diversity strength by taking row-wise means by omitting diagonal values
         torch.diagonal(pairwise_matrix)[:] = float('nan')
         ds = torch.nanmean(pairwise_matrix, dim=0)
-
+        
         # Setting up dictionary of model weights
         DS_dict = {T[i]: ds[i].item() for i in range(num_items)}
+        self.ds_batch = DS_dict
         return DS_dict
 
 class Weighting_Scheme:
     def __init__(self, scores_batch, ranks_batch, model_accuracies:dict = {}, norm_regression=False):
         self.scores_batch = scores_batch
         self.ranks_batch = ranks_batch
-
+        
         # Save model names as a list for clarity
         # (scores_batch and ranks_batch model names are the same)
         self.models = scores_batch.keys()
         self.model_accuracies = model_accuracies.copy() if model_accuracies is not None else {key: 0 for key in scores_batch.keys()}
         
-        self.rank_score_functions = {m: self.scores_batch[m] * self.ranks_batch[m]**(-1) for m in self.models}
+        # self.rank_score_functions = {m: self.scores_batch[m] * self.ranks_batch[m]**(-1) for m in self.models}
+        self.rank_score_functions = self.scores_batch
+
         self.RSC = RankScoreCharacteristic(norm_regression)
 
         # List of Weight Functions

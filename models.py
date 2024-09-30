@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from itertools import combinations
-from utils.utils import plot_average_rows, tensor_indices, plot_model_performance
+from utils.utils import plot_single_row, plot_average_rows, tensor_indices, plot_model_performance, write_dicts_to_csv, annotate_image_with_csv
 from rank_score_characteristic import Weighting_Scheme
 from majority_vote import JudgeMajorityVote
 from sklearn.metrics import mean_squared_error, r2_score
@@ -12,7 +12,7 @@ class InFusionLayer:
 
         self.weighting_schemes = weighting_schemes
         self.BATCH_SIZE = BATCH_SIZE
-        self.K = 5
+        self.K = 4
         self.PLOT_AVG_RSC = True
 
         self.score_data = score_data
@@ -28,6 +28,10 @@ class InFusionLayer:
         except:
             first_key = next(iter(score_data))  # Gets the first key
             self.DATASET_LEN = len(score_data[first_key]) 
+        
+        # self.model_scores_batch = []
+        # self.pairwise_matrix_batch = []
+        self.ds_batches = []
 
     def get_combinations(self, models):
         lengths = [x for x in range(len(models)+1)]
@@ -74,6 +78,10 @@ class InFusionLayer:
         Weight_Schemes = Weighting_Scheme(scores_batch, ranks_batch, model_accuracies)
         for scheme in self.weighting_schemes:
             dic[scheme] = Weight_Schemes[scheme]
+        
+        # self.model_scores_batch.append(Weight_Schemes.RSC.model_scores_batch)
+        # self.pairwise_matrix_batch.append(Weight_Schemes.RSC.pairwise_matrix_batch)
+        self.ds_batches.append(Weight_Schemes.RSC.ds_batch)
         return dic
 
     def combinatorial_fusion_analysis(self, scores_batch, ranks_batch, weighting_schemes, combs):
@@ -97,7 +105,7 @@ class InFusionLayer:
             # Initialize tensors for scores and ranks for the batch
             scores_batch = {d: scores[batch_indices] for d, scores in score_data.items()}
             ranks_batch = {d: ranks[batch_indices] for d, ranks in rank_data.items()}
-            
+
             # Obtain weight vectors based on a selection of weighting schemes
             weighting_schemes = self.weighting_scheme(scores_batch, ranks_batch, model_accuracies)
 
@@ -149,6 +157,8 @@ class InFusionLayer:
         score_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.score_data.items()}
         rank_tensors = {d: torch.tensor(df.values, dtype=torch.float32) for d, df in self.rank_data.items()}
         
+        self.score_tensors = score_tensors
+
         # for row in rank_tensors['C']:
         #     print(row.T)
         #     break
@@ -176,6 +186,8 @@ class InFusionLayer:
         # for i in rank_tensors:
         #     print(f"Tie Ranks {i}: {self.check_tie_ranks(rank_tensors[i])}")
 
+        DATA_ITEM = 0
+        if self.PLOT_AVG_RSC: plot_single_row(score_tensors, rank_tensors, self.OUTPATH, DATA_ITEM, 0)
         if self.PLOT_AVG_RSC: plot_average_rows(score_tensors, rank_tensors, self.OUTPATH, self.DATASET_LEN, 0)
 
         fusion_models_sc, fusion_models_rc = self.batch_combination(score_tensors, rank_tensors, base_model_accuracies, self.BATCH_SIZE)
@@ -209,11 +221,18 @@ class InFusionLayer:
             # Save to CSV
             csv_filename = f"{self.OUTPATH}/models_performance_0.csv"
             df.to_csv(csv_filename, index=False)
+            
             plot_model_performance(f"{self.OUTPATH}", csv_filename, *self.base_models)
+            
+            # write_dicts_to_csv(self.model_scores_batch, f"{self.OUTPATH}/batch_model_scores.csv")
+            # write_dicts_to_csv(self.pairwise_matrix_batch, f"{self.OUTPATH}/batch_pairwise_matrices.csv")
+            write_dicts_to_csv(self.ds_batches, f"{self.OUTPATH}/batch_diversity_strengths.csv")
+            annotate_image_with_csv(f'{self.OUTPATH}/RSC Data Item {DATA_ITEM}; Iteration-0.png', f"{self.OUTPATH}/batch_diversity_strengths.csv", DATA_ITEM)
 
             self.highest_score_value_pair, max_s_val = self.update_max(top_k_sc_models, self.highest_score_value_pair, max_s_val)
             self.highest_rank_value_pair, max_r_val = self.update_max(top_k_rc_models, self.highest_rank_value_pair, max_r_val)
             top_2 = [self.highest_score_value_pair, self.highest_rank_value_pair]
+
             print(f"End Top Model: {max(top_2, key=lambda x: x[1])}\n")
             print(f"{max(top_2, key=lambda x: x[1])[1] - self.highest_start}% improvement from base models.")
             print("Done!")
@@ -255,6 +274,7 @@ class InFusionNet(InFusionLayer):
         for i in range(15): # turn to while (len(top_5) > 0)
             print(f"Optimization: {i+1}")
             
+            if plot_avg_rsc: plot_single_row(fusion_models_sc, fusion_models_rc, OUTPATH, self.DATASET_LEN, i+1)
             if plot_avg_rsc: plot_average_rows(fusion_models_sc, fusion_models_rc, OUTPATH, self.DATASET_LEN, i+1)
 
             # Scores

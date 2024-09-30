@@ -37,18 +37,18 @@ def get_mnist():
     return [X_train, X_test, y_train, y_test, f"{out_path}{dataset}"]
 
 def train_models():
-    random_forest = RandomForestClassifier(n_estimators=100, random_state=42)
-    adaBoost = AdaBoostClassifier(n_estimators=100)
+    random_forest = RandomForestClassifier(max_depth=36, n_estimators=171, random_state=42)
+    adaBoost = AdaBoostClassifier(learning_rate = 0.3845401188473625, n_estimators=100)
     support_vector_machine = SVC(probability=True)
     mlp = MLPClassifier(hidden_layer_sizes=(50,), max_iter=500, random_state=42)
     decision_tree = DecisionTreeClassifier(criterion="gini", random_state=42,max_depth=3, min_samples_leaf=5)
 
     M = {
-        "m1": random_forest, 
-        "m2": adaBoost, 
-        "m3": support_vector_machine, 
-        "m4": mlp, 
-        "m5": decision_tree 
+        "random_forest": random_forest, 
+        "adaBoost": adaBoost, 
+        "support_vector_machine": support_vector_machine, 
+        "mlp": mlp, 
+        "decision_tree": decision_tree 
         }
 
     X_train, X_test, y_train, y_test, out = get_mnist()
@@ -57,7 +57,14 @@ def train_models():
 
     # T is a dictionary of scoring system tensors with keys {t_1, t_2, ..., t_N}
     T = classification_suite(M, X_train, y_train, X_test, y_test, out)
-
+    
     df_reset = ground_truths.reset_index(drop=True)
     G = df_reset.iloc[:, 0].astype(int)
     return T, G
+
+import time
+
+start_time = time.time()
+train_models()
+end_time = time.time()
+print(start_time - end_time)
