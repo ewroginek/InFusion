@@ -15,7 +15,7 @@ This script allows users to run the InFusion model with customizable settings vi
 Given a directory of prediction tensors as a .csv file, you can use the following command in your terminal. You can adjust the parameters as needed.
 
 ```bash
-python main.py --root './tensor_predictions/' --tensorset 'mnist' --batch_size 1024 --weighting_schemes 'AC,WC-CDS,WC-KDS,WCP' --model_type 'layer'
+python main.py --root './tensor_predictions/' --tensorset 'mnist' --batch_size 1024 --weighting_schemes 'AC,WC-CDS,WCP' --model_type 'layer'
 ```
 
 If you'd like to improve classification accuracy immediately after model training, you can run the following code to see an example of how this is done using 5 sklearn models trained on the MNIST dataset.
@@ -30,3 +30,14 @@ Interscience, 2004)
 If you have regression data, consider using the example in `run_regression.py`. `InFusionRegression` takes a dictionary of vectors and uses different weighting schemes and combination types to produce new models.
 
 If you have no ground truth labels, your problem is an unsupervised learning problem. Consider using the example in `run_unsupervised.py`.
+
+## Citation
+
+If you use this tool in your research, please cite the following paper:
+
+@inproceedings{roginek2024infusionlayer,
+  title={InFusionLayer: A CFA-based ensemble tool to generate new classifiers for learning and modeling},
+  author={Roginek, E. R. and Xu, J. and Hsu, D. F.},
+  booktitle={Proceedings of the IEEE International Conference on Tools with Artificial Intelligence (ICTAI)},
+  year={2024}
+}

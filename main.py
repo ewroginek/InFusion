@@ -2,7 +2,7 @@ import argparse
 import time
 import os
 from models import InFusionLayer, InFusionNet
-from utils.utils import get_outputs
+from utils.utils import get_outputs, average_multiclassification_accuracy
 
 def main(args):
     ROOT = args.root
@@ -31,7 +31,9 @@ def main(args):
     if MODEL_TYPE == 'layer':
         # Supervised
         model = InFusionLayer(score_data, ground_truth['0'], OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
-        model.predict(matrices=True)
+        model.predict()
+        # combined_models = model.predict(matrices=True)
+        # average_multiclassification_accuracy(model.score_tensors, combined_models, ground_truth['0'], OUTPATH)
         
         # Unsupervised
         # model = InFusionLayer(score_data=score_data, ground_truth=None, OUTPATH = OUTPATH, weighting_schemes=weighting_schemes, BATCH_SIZE=BATCH_SIZE)
